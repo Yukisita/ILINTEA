@@ -374,7 +374,8 @@ function resizeStage() {
     const style = getComputedStyle(host);
     const availableWidth = host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     const availableHeight = host.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-    stageScale = Math.max(.01, Math.min(availableWidth / 1280, viewer || document.fullscreenElement ? availableHeight / 720 : Infinity));
+    const fitHeight = viewer || document.fullscreenElement || style.getPropertyValue('--fit-stage-height').trim() === '1';
+    stageScale = Math.max(.01, Math.min(availableWidth / 1280, fitHeight ? availableHeight / 720 : Infinity));
     $('stage-viewport').style.width = `${1280 * stageScale}px`;
     $('stage-viewport').style.height = `${720 * stageScale}px`;
     $('stage').style.transform = `scale(${stageScale})`;

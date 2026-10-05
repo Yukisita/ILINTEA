@@ -27,8 +27,10 @@ main { padding: 20px 24px; max-width: 1800px; margin: auto; }
 .toolbar { justify-content: space-between; padding: 12px 16px; background: #fff; border: 1px solid #dee2e6; border-radius: 7px; margin-bottom: 16px; flex-wrap: wrap; }
 .toolbar .button-group { flex-wrap: wrap; }
 .muted { color: #6c757d; font-size: 13px; }
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
-.canvas-column { min-width: 0; }
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "canvas properties" "elements properties"; gap: 20px; align-items: start; }
+.canvas-column { grid-area: canvas; min-width: 0; }
+.elements-panel { grid-area: elements; min-width: 0; }
+.properties { grid-area: properties; min-width: 0; }
 .stage-host { background: #e9ecef; border: 1px solid #dee2e6; border-radius: 7px; padding: 24px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
 .stage-viewport { position: relative; flex: none; overflow: hidden; background: #000; box-shadow: 0 2px 8px #0002; }
 .stage { position: absolute; width: 1280px; height: 720px; left: 0; top: 0; background: #000; transform-origin: top left; overflow: hidden; color: #fff; }
@@ -76,6 +78,7 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid #e9ecef; paddin
 .element-row > button { min-width: 0; width: 100%; display: flex; gap: 14px; text-align: left; background: transparent; border: 0; color: #212529; padding: 10px; }
 .element-row > button:hover { background: #0d6efd0b; }
 .element-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.element-row > button span { flex: 1; }
 .element-row small { flex: none; color: #6c757d; }
 .notice { padding: 12px 16px; background: #fff3cd; border: 1px solid #ffe69c; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
 .alarm-panel { margin-top: 16px; background: #fff; border: 1px solid #dee2e6; border-radius: 7px; overflow: hidden; }
@@ -104,6 +107,54 @@ footer { border-top: 1px solid #dee2e6; padding: 16px 24px; font-size: 12px; col
 .stage-host:fullscreen { width: 100vw; height: 100dvh; padding: 0; border: 0; border-radius: 0; background: #000; }
 .stage-host:fullscreen .fullscreen-exit { display: block; position: absolute; top: 14px; right: 14px; opacity: 0; transition: opacity .2s; }
 .stage-host:fullscreen .fullscreen-exit:hover, .stage-host:fullscreen .fullscreen-exit:focus-visible { opacity: 1; }
+/* Keep every control and all 20 elements in view on a desktop display. */
+@media (min-width: 1200px) and (min-height: 900px) {
+  body:not(.viewer) { height: 100dvh; display: flex; flex-direction: column; }
+  body:not(.viewer) .navbar { flex: none; padding: 10px 20px; }
+  body:not(.viewer) .brand { font-size: 20px; }
+  body:not(.viewer) main { flex: 1; min-height: 0; width: 100%; max-width: none; padding: 12px 16px; display: flex; flex-direction: column; }
+  body:not(.viewer) button, body:not(.viewer) .mode-tabs a { padding: 6px 10px; font-size: 13px; }
+  body:not(.viewer) .mode-bar { flex: none; margin-bottom: 10px; }
+  body:not(.viewer) .toolbar { flex: none; padding: 8px 12px; margin-bottom: 12px; }
+  body:not(.viewer) .workspace { flex: 1; min-height: 0; grid-template-columns: 240px 360px minmax(0, 1fr); grid-template-areas: "elements properties canvas"; gap: 12px; align-items: stretch; }
+  body:not(.viewer) .canvas-column { min-height: 0; display: flex; flex-direction: column; }
+  body:not(.viewer) .canvas-column > .stage-host { --fit-stage-height: 1; flex: 1; min-height: 0; padding: 16px; }
+  .canvas-help { flex: none; padding: 8px 0; font-size: 11px; gap: 6px; }
+  .elements-panel .panel-heading { padding: 12px 10px; }
+  #element-list { padding: 6px; }
+  .element-row { height: 28px; }
+  body:not(.viewer) .element-row > button { gap: 6px; padding: 4px 6px; font-size: 13px; }
+  .element-row small { font-size: 10px; }
+  .properties > h2 { padding: 10px 12px; }
+  .properties fieldset { padding: 10px 12px; }
+  .properties input:not([type="checkbox"]), .properties select { padding: 5px 7px; font-size: 13px; }
+  .properties textarea { height: 84px; resize: none; margin: 6px 0 8px; padding: 7px 9px; }
+  #script-fields { padding: 0 0 8px; }
+  #script-speed { display: block; height: 18px; padding: 0; border: 0; margin: 4px 0; }
+  .script-controls { margin-top: 4px; }
+  #script-status { margin: 6px 0 0; font-size: 12px; line-height: 1.5; }
+  #type-fields { display: grid; grid-template-columns: 1fr 64px 1fr; gap: 10px; }
+  .field-row { display: flex; flex-direction: column; align-items: stretch; gap: 5px; margin: 0; }
+  .properties input[type="color"] { height: 31px; padding: 3px; }
+  .properties h3 { margin: 10px 0 8px; padding-top: 8px; font-weight: 600; }
+  .position-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .checkbox-label { margin: 10px 0; }
+  .delay-inputs { grid-template-columns: minmax(0, 1fr) 100px; gap: 8px; }
+  .delay-inputs input, .delay-inputs select { margin-top: 5px; }
+  .schedule-controls { margin-top: 8px; }
+  #display-status { font-size: 12px; line-height: 1.5; margin: 8px 0 12px; }
+  .alarm-panel { flex: none; margin: 0; }
+  .alarm-panel .panel-heading { padding: 9px 12px; }
+  #alarm-form { padding: 10px 12px; }
+  #alarm-fields { display: flex; align-items: end; gap: 12px; }
+  .alarm-inputs { flex: 1; min-width: 0; gap: 10px; margin: 0; grid-template-columns: minmax(215px, 1fr) minmax(0, 1.3fr); }
+  .alarm-inputs input { font-size: 13px; padding: 6px 8px; margin-top: 4px; }
+  #alarm-fields > .button-group { flex: none; max-width: 130px; gap: 6px; flex-wrap: wrap; justify-content: end; }
+  .alarm-status { font-size: 12px; margin-bottom: 8px; }
+  .alarm-help { font-size: 11px; margin-top: 8px; line-height: 1.5; }
+  body:not(.viewer) .notice { position: fixed; z-index: 200; top: 58px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); box-shadow: 0 3px 12px #0002; }
+  body:not(.viewer) footer { flex: none; padding: 8px 16px; }
+}
 @media (max-width: 960px) {
   .workspace { grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; }
   main { padding: 16px; }
@@ -115,7 +166,7 @@ footer { border-top: 1px solid #dee2e6; padding: 16px 24px; font-size: 12px; col
   .nav-caption { display: none; }
   .brand { font-size: 21px; }
   main { padding: 12px; }
-  .workspace { grid-template-columns: 1fr; }
+  .workspace { grid-template-columns: 1fr; grid-template-areas: "canvas" "elements" "properties"; }
   .mode-bar { gap: 12px; }
   .mode-actions { flex: 1; justify-content: space-between; }
   .toolbar { padding: 10px; gap: 6px; }
