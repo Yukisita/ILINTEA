@@ -45,10 +45,19 @@ app.MapGet("/api/events", async (HttpContext context, BoardStore board) =>
 
 app.MapPost("/api/elements", (CreateElement request, BoardStore board) =>
 {
-    if (request.Kind is not ("text" or "clock"))
-        return Results.BadRequest(new { error = "追加できるのは時計・テキストです。" });
-    var element = board.Add(request.Kind);
+    if (request.Kind is not ("text" or "clock" or "script"))
+        return Results.BadRequest(new { error = "追加する要素の種類を確認してください。" });
+    if (request.Kind == "script" && (string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 50000))
+        return Results.BadRequest(new { error = "TXT原稿は1～50,000文字で指定してください。" });
+    var element = board.Add(request.Kind, text: request.Text);
     return element is null ? Results.BadRequest(new { error = "要素は20個まで追加できます。" }) : Results.Ok(element);
+});
+
+app.MapPost("/api/elements/{id:guid}/playback", (Guid id, ScriptControl control, BoardStore board) =>
+{
+    if (!control.IsValid()) return Results.BadRequest(new { error = "スクロール速度は5～200の範囲で指定してください。" });
+    var element = board.ControlScript(id, control);
+    return element is null ? Results.NotFound(new { error = "TXT原稿が見つかりません。" }) : Results.Ok(element);
 });
 
 app.MapPatch("/api/elements/{id:guid}", (Guid id, ElementPatch patch, BoardStore board) =>

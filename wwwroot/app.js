@@ -17,10 +17,12 @@ let noticeTimer;
 let alarmSaving = false;
 let alarmFormDirty = false;
 let shownAlarmId = null;
+let scriptBusy = false;
 const pending = new Map();
 const inFlight = new Map();
 const nodes = new Map();
-const kinds = { text: 'テキスト', clock: '時計', image: '画像' };
+const scriptLimits = new Map();
+const kinds = { text: 'テキスト', clock: '時計', image: '画像', script: 'TXT原稿' };
 const fields = { text: 'text', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height', visible: 'visible' };
 let flipX = false;
 let flipY = false;
@@ -105,6 +107,7 @@ function render() {
         if (!liveIds.has(id)) {
             node.remove();
             nodes.delete(id);
+            scriptLimits.delete(id);
             pending.delete(id);
         }
     }
@@ -117,6 +120,11 @@ function render() {
             node.dataset.id = element.id;
             const content = document.createElement('div');
             content.className = 'element-content';
+            if (element.kind === 'script') {
+                const script = document.createElement('div');
+                script.className = 'script-text';
+                content.append(script);
+            }
             if (element.kind === 'image') {
                 const image = document.createElement('img');
                 image.src = element.imageUrl;
@@ -149,6 +157,11 @@ function render() {
         node.style.textAlign = element.align;
         node.classList.toggle('selected', element.id === selectedId);
         if (element.kind === 'text') node.firstElementChild.textContent = element.text;
+        if (element.kind === 'script') {
+            const script = node.firstElementChild.firstElementChild;
+            if (script.textContent !== element.text) script.textContent = element.text;
+            if (element.visible) scriptLimits.set(element.id, Math.max(0, script.scrollHeight - element.height));
+        }
         if (!viewer) node.lastElementChild.hidden = element.id !== selectedId;
     }
     updateClocks();
@@ -169,7 +182,7 @@ function renderList() {
         button.type = 'button';
         button.setAttribute('aria-pressed', String(element.id === selectedId));
         const label = document.createElement('span');
-        label.textContent = `${kinds[element.kind]}${element.kind === 'text' ? ` · ${element.text.split('\n')[0] || '空欄'}` : ''}`;
+        label.textContent = `${kinds[element.kind]}${['text', 'script'].includes(element.kind) ? ` · ${element.text.split('\n')[0] || '空欄'}` : ''}`;
         const visibility = document.createElement('small');
         visibility.textContent = element.visible ? '表示' : '非表示';
         button.append(label, visibility);
@@ -187,7 +200,9 @@ function renderProperties() {
     $('selection-empty').hidden = !!element;
     $('property-title').textContent = element ? `${kinds[element.kind]}設定` : '要素の設定';
     if (!element) return;
-    $('text-fields').hidden = element.kind !== 'text';
+    $('text-fields').hidden = !['text', 'script'].includes(element.kind);
+    $('text').maxLength = element.kind === 'script' ? 50000 : 4000;
+    $('script-fields').hidden = element.kind !== 'script';
     $('type-fields').hidden = element.kind === 'image';
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);
@@ -195,6 +210,57 @@ function renderProperties() {
         if (input.type === 'checkbox') input.checked = element[property];
         else input.value = element[property];
     }
+    renderScriptControls();
+}
+
+function scriptPosition(element) {
+    const playback = element.playback;
+    return playback.offset + (playback.startedAt
+        ? Math.max(0, (Date.now() + serverOffset - Date.parse(playback.startedAt)) / 1000) * playback.speed : 0);
+}
+
+function renderScriptControls() {
+    const element = selectedElement();
+    if (viewer || element?.kind !== 'script') return;
+    const limit = scriptLimits.get(element.id) ?? 0;
+    const ended = scriptPosition(element) >= limit;
+    const busy = !connected || scriptBusy || pending.has(element.id) || inFlight.has(element.id);
+    const running = !!element.playback.startedAt;
+    $('script-play').disabled = busy || running || ended;
+    $('script-pause').disabled = busy || !running;
+    $('script-reset').disabled = busy;
+    $('script-speed').disabled = busy;
+    if (document.activeElement !== $('script-speed')) {
+        $('script-speed').value = element.playback.speed;
+        $('script-speed-value').textContent = `${element.playback.speed} px/秒`;
+    }
+    const status = limit === 0 ? '原稿全体が表示枠に収まっています。'
+        : ended ? '最後まで表示しました。「先頭へ」で戻せます。'
+        : running ? '再生中・閲覧画面と同期しています' : '停止中';
+    if ($('script-status').textContent !== status) $('script-status').textContent = status;
+}
+
+function animateScripts() {
+    for (const element of state.elements) {
+        if (element.kind !== 'script' || !nodes.has(element.id)) continue;
+        const offset = Math.min(scriptLimits.get(element.id) ?? 0, scriptPosition(element));
+        nodes.get(element.id).firstElementChild.firstElementChild.style.transform = `translateY(-${offset.toFixed(2)}px)`;
+    }
+    requestAnimationFrame(animateScripts);
+}
+
+async function controlScript(action, speed) {
+    const element = selectedElement();
+    if (!connected || scriptBusy || element?.kind !== 'script') return;
+    scriptBusy = true;
+    renderScriptControls();
+    try {
+        await request(`/api/elements/${element.id}/playback`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, speed })
+        });
+        await refreshBoard();
+    } catch (error) { notify(error.message); }
+    finally { scriptBusy = false; renderScriptControls(); }
 }
 
 function startGesture(event) {
@@ -260,6 +326,7 @@ function updateClocks() {
         if (element.kind === 'clock') nodes.get(element.id).firstElementChild.textContent = time;
     }
     renderAlarm();
+    renderScriptControls();
 }
 
 function localDateTimeValue(date) {
@@ -333,7 +400,7 @@ function setConnection(value) {
     connected = value;
     $('connection').textContent = value ? '同期中' : '再接続中…';
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
-    for (const id of ['add-clock', 'add-text', 'add-image']) $(id).disabled = !value;
+    for (const id of ['add-clock', 'add-text', 'add-image', 'add-script']) $(id).disabled = !value;
     $('property-fields').disabled = !value;
     renderAlarm();
 }
@@ -356,6 +423,31 @@ events.onerror = () => {
 };
 
 if (!viewer) {
+    $('add-script').addEventListener('click', () => $('script-file').click());
+    $('script-file').addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+            if (!/\.txt$/i.test(file.name) || file.size > 256 * 1024)
+                throw new Error('256KB以下のTXTファイルを選んでください。');
+            let text;
+            try { text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()); }
+            catch { throw new Error('UTF-8で保存したTXTファイルを選んでください。'); }
+            text = text.replace(/\r\n?/g, '\n');
+            if (!text.trim() || text.length > 50000) throw new Error('原稿は1～50,000文字にしてください。');
+            const element = await request('/api/elements', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'script', text })
+            });
+            await refreshBoard();
+            select(element.id);
+        } catch (error) { notify(error.message); }
+        finally { event.target.value = ''; }
+    });
+    $('script-play').addEventListener('click', () => controlScript('play'));
+    $('script-pause').addEventListener('click', () => controlScript('pause'));
+    $('script-reset').addEventListener('click', () => controlScript('reset'));
+    $('script-speed').addEventListener('input', () => { $('script-speed-value').textContent = `${$('script-speed').value} px/秒`; });
+    $('script-speed').addEventListener('change', () => controlScript('speed', Number($('script-speed').value)));
     $('alarm-form').addEventListener('input', () => { alarmFormDirty = true; });
     $('alarm-form').addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -459,4 +551,5 @@ $('exit-fullscreen').addEventListener('click', () => document.exitFullscreen());
 document.addEventListener('fullscreenchange', resizeStage);
 new ResizeObserver(resizeStage).observe($('stage-host'));
 setInterval(updateClocks, 250);
+requestAnimationFrame(animateScripts);
 updateMirror();

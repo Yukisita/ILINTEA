@@ -4,21 +4,33 @@ using System.Threading.Channels;
 namespace StreamPrompter;
 
 public record Element(Guid Id, string Kind, double X, double Y, double Width, double Height,
-    string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true)
+    string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
+    ScriptPlayback? Playback = null)
 {
     public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}" : null;
+}
+
+public record ScriptPlayback(double Speed = 30, double Offset = 0, DateTimeOffset? StartedAt = null)
+{
+    public double PositionAt(DateTimeOffset now) => Offset +
+        (StartedAt is { } start ? Math.Max(0, (now - start).TotalSeconds) * Speed : 0);
+}
+public record ScriptControl(string Action, double? Speed)
+{
+    public bool IsValid() => Action is "play" or "pause" or "reset" ||
+        (Action == "speed" && Speed is >= 5 and <= 200);
 }
 
 public record BoardAlarm(Guid Id, DateTimeOffset At, string Message);
 public record ScheduleAlarm(DateTimeOffset At, string? Message);
 public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, BoardAlarm? Alarm);
-public record CreateElement(string Kind);
+public record CreateElement(string Kind, string? Text = null);
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
     int? FontSize, string? Color, string? Align, bool? Visible)
 {
     public bool IsValid() =>
         new[] { X, Y, Width, Height }.All(value => value is null || double.IsFinite(value.Value)) &&
-        (Text is null || Text.Length <= 4000) &&
+        (Text is null || Text.Length <= 50000) &&
         (FontSize is null or >= 12 and <= 160) &&
         (Color is null || Regex.IsMatch(Color, "^#[0-9a-fA-F]{6}$")) &&
         (Align is null or "left" or "center" or "right");
@@ -80,7 +92,7 @@ public sealed class BoardStore
         }
     }
 
-    public Element? Add(string kind, ImageData? image = null)
+    public Element? Add(string kind, ImageData? image = null, string? text = null)
     {
         lock (gate)
         {
@@ -89,6 +101,7 @@ public sealed class BoardStore
             {
                 "clock" => new Element(Guid.NewGuid(), kind, 880, 24, 368, 88, Align: "right"),
                 "image" => new Element(Guid.NewGuid(), kind, 80, 440, 240, 180),
+                "script" => new Element(Guid.NewGuid(), kind, 80, 140, 1120, 420, text ?? "", 48, Playback: new()),
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "ここにテキストを入力", 56)
             };
             elements.Add(element);
@@ -116,7 +129,9 @@ public sealed class BoardStore
                 FontSize = patch.FontSize ?? current.FontSize,
                 Color = patch.Color ?? current.Color,
                 Align = patch.Align ?? current.Align,
-                Visible = patch.Visible ?? current.Visible
+                Visible = patch.Visible ?? current.Visible,
+                Playback = patch.Text is not null && patch.Text != current.Text && current.Playback is { } playback
+                    ? playback with { Offset = 0, StartedAt = null } : current.Playback
             };
             elements[index] = updated;
             Publish();
@@ -138,6 +153,30 @@ public sealed class BoardStore
     public ImageData? GetImage(Guid id)
     {
         lock (gate) return images.GetValueOrDefault(id);
+    }
+
+    public Element? ControlScript(Guid id, ScriptControl control)
+    {
+        lock (gate)
+        {
+            var index = elements.FindIndex(element => element.Id == id && element.Kind == "script");
+            if (index < 0) return null;
+            var element = elements[index];
+            var playback = element.Playback!;
+            var now = DateTimeOffset.UtcNow;
+            var position = playback.PositionAt(now);
+            playback = control.Action switch
+            {
+                "play" => playback with { StartedAt = playback.StartedAt ?? now },
+                "pause" => playback with { Offset = position, StartedAt = null },
+                "reset" => playback with { Offset = 0, StartedAt = null },
+                "speed" => playback with { Speed = control.Speed!.Value, Offset = position, StartedAt = playback.StartedAt is null ? null : now },
+                _ => playback
+            };
+            elements[index] = element with { Playback = playback };
+            Publish();
+            return elements[index];
+        }
     }
 
     public BoardAlarm? SetAlarm(ScheduleAlarm request)
