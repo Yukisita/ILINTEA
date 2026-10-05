@@ -24,18 +24,35 @@
       <span class="muted">16:9 <span class="canvas-size">／ 1280 × 720</span></span>
     </div>
     <div class="toolbar viewer-only">
-      <span class="muted">出演者用</span><div class="button-group"><button id="flip-x" aria-pressed="false">↔ 左右反転</button><button id="flip-y" aria-pressed="false">↕ 上下反転</button><button id="fullscreen">⛶ 全画面</button></div>
+      <span id="viewer-alarm-status" class="muted">出演者用</span><div class="button-group"><button id="flip-x" aria-pressed="false">↔ 左右反転</button><button id="flip-y" aria-pressed="false">↕ 上下反転</button><button id="fullscreen">⛶ 全画面</button></div>
     </div>
     <div class="workspace">
       <section class="canvas-column" aria-label="表示画面">
         <div id="stage-host" class="stage-host">
-          <div id="stage-viewport" class="stage-viewport"><div id="stage" class="stage"></div></div>
+          <div id="stage-viewport" class="stage-viewport"><div id="stage" class="stage">
+            <div id="alarm-alert" class="alarm-alert" role="alert" hidden><strong>アラーム</strong><span id="alarm-alert-message"></span></div>
+          </div></div>
           <button id="exit-fullscreen" class="fullscreen-exit">全画面を終了</button>
+          <button id="stop-alarm" class="stop-alarm" hidden>通知を止める</button>
         </div>
         <div class="canvas-help editor-only"><span>ドラッグで移動・右下のハンドルでサイズ変更</span><span id="save-status" role="status">変更は自動で反映されます</span></div>
         <section class="elements-panel editor-only">
           <div class="panel-heading"><h2>配置中の要素</h2><span id="element-count" class="muted"></span></div>
           <div id="element-list"></div>
+        </section>
+        <section class="alarm-panel editor-only" aria-label="アラーム設定">
+          <div class="panel-heading"><h2>アラーム</h2><span class="muted">画面通知・音なし</span></div>
+          <form id="alarm-form">
+            <p id="alarm-status" class="alarm-status" role="status">アラームは設定されていません。</p>
+            <fieldset id="alarm-fields" disabled>
+              <div class="alarm-inputs">
+                <label>通知日時<input id="alarm-at" type="datetime-local" step="1" required></label>
+                <label>通知メッセージ<input id="alarm-message" type="text" maxlength="120" placeholder="設定した時刻になりました"></label>
+              </div>
+              <div class="button-group"><button id="schedule-alarm" type="submit">設定する</button><button id="cancel-alarm" type="button" hidden>解除する</button></div>
+            </fieldset>
+            <p class="muted alarm-help">1件を全画面で共有します。停止・解除すると全端末の通知が消えます。</p>
+          </form>
         </section>
       </section>
       <aside class="properties editor-only" aria-label="要素の設定">

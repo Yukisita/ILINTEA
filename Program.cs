@@ -16,6 +16,16 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapGet("/api/board", (BoardStore board) => board.Snapshot());
+app.MapPut("/api/alarm", (ScheduleAlarm request, BoardStore board) =>
+{
+    var alarm = board.SetAlarm(request);
+    return alarm is null
+        ? Results.BadRequest(new { error = "未来の日時と120文字以内のメッセージを指定してください。" })
+        : Results.Ok(alarm);
+});
+app.MapDelete("/api/alarm/{id:guid}", (Guid id, BoardStore board) =>
+    board.ClearAlarm(id) ? Results.NoContent() : Results.NotFound(new { error = "アラームは変更または解除されています。" }));
+
 app.MapGet("/api/events", async (HttpContext context, BoardStore board) =>
 {
     context.Response.ContentType = "text/event-stream";

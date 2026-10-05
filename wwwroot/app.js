@@ -14,6 +14,9 @@ let gesture = null;
 let sending = false;
 let flushTimer;
 let noticeTimer;
+let alarmSaving = false;
+let alarmFormDirty = false;
+let shownAlarmId = null;
 const pending = new Map();
 const inFlight = new Map();
 const nodes = new Map();
@@ -248,11 +251,62 @@ function resizeStage() {
 }
 
 const clockFormatter = new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+const alarmFormatter = new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+});
 function updateClocks() {
     const time = clockFormatter.format(new Date(Date.now() + serverOffset));
     for (const element of state.elements) {
         if (element.kind === 'clock') nodes.get(element.id).firstElementChild.textContent = time;
     }
+    renderAlarm();
+}
+
+function localDateTimeValue(date) {
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function renderAlarm() {
+    const alarm = state.alarm;
+    const active = !!alarm && Date.now() + serverOffset >= Date.parse(alarm.at);
+    const when = alarm ? alarmFormatter.format(new Date(alarm.at)) : '';
+    const text = !alarm ? 'アラームは設定されていません。'
+        : `${active ? '通知中' : '設定済み'}：${when} — ${alarm.message}`;
+    // Avoid repeatedly announcing an unchanged status to assistive technology.
+    if ($('alarm-status').textContent !== text) $('alarm-status').textContent = text;
+    $('alarm-status').classList.toggle('active', active);
+    $('viewer-alarm-status').textContent = alarm ? `アラーム ${when}${active ? '・通知中' : ''}` : '出演者用';
+    const alertText = active ? alarm.message : '';
+    if ($('alarm-alert-message').textContent !== alertText) $('alarm-alert-message').textContent = alertText;
+    $('alarm-alert').hidden = !active;
+    $('stage').classList.toggle('alarm-active', active);
+    $('stop-alarm').hidden = !active;
+    $('stop-alarm').disabled = !connected || alarmSaving;
+    $('alarm-fields').disabled = !connected || alarmSaving;
+    $('cancel-alarm').hidden = !alarm;
+    $('cancel-alarm').textContent = active ? '通知を止める' : '解除する';
+    $('schedule-alarm').textContent = alarm ? '設定を置き換える' : '設定する';
+    const id = alarm?.id ?? '';
+    if (shownAlarmId !== id) {
+        shownAlarmId = id;
+        if (!alarmFormDirty) {
+            $('alarm-at').value = localDateTimeValue(alarm ? new Date(alarm.at) : new Date(Date.now() + serverOffset + 5 * 60_000));
+            $('alarm-message').value = alarm?.message ?? '';
+        }
+    }
+}
+
+async function clearAlarm() {
+    if (!connected || alarmSaving || !state.alarm) return;
+    const id = state.alarm.id;
+    alarmSaving = true;
+    renderAlarm();
+    try {
+        await request(`/api/alarm/${id}`, { method: 'DELETE' });
+        await refreshBoard();
+    } catch (error) { notify(error.message); }
+    finally { alarmSaving = false; renderAlarm(); }
 }
 
 async function addElement(kind) {
@@ -281,6 +335,7 @@ function setConnection(value) {
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
     for (const id of ['add-clock', 'add-text', 'add-image']) $(id).disabled = !value;
     $('property-fields').disabled = !value;
+    renderAlarm();
 }
 
 const events = new EventSource('/api/events');
@@ -301,6 +356,29 @@ events.onerror = () => {
 };
 
 if (!viewer) {
+    $('alarm-form').addEventListener('input', () => { alarmFormDirty = true; });
+    $('alarm-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!connected || alarmSaving) return;
+        const date = new Date($('alarm-at').value);
+        if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
+            notify('アラームは未来の日時を指定してください。');
+            return;
+        }
+        alarmSaving = true;
+        renderAlarm();
+        try {
+            await request('/api/alarm', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ at: date.toISOString(), message: $('alarm-message').value })
+            });
+            alarmFormDirty = false;
+            shownAlarmId = null;
+            await refreshBoard();
+        } catch (error) { notify(error.message); }
+        finally { alarmSaving = false; renderAlarm(); }
+    });
+    $('cancel-alarm').addEventListener('click', clearAlarm);
     $('add-clock').addEventListener('click', () => addElement('clock'));
     $('add-text').addEventListener('click', () => addElement('text'));
     $('add-image').addEventListener('click', () => $('image-file').click());
@@ -359,6 +437,8 @@ if (!viewer) {
         if (pending.size || sending) { event.preventDefault(); event.returnValue = ''; }
     });
 }
+
+$('stop-alarm').addEventListener('click', clearAlarm);
 
 function updateMirror() {
     $('flip-x').setAttribute('aria-pressed', String(flipX));

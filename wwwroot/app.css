@@ -67,6 +67,21 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid #e9ecef; paddin
 .element-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .element-row small { flex: none; color: #6c757d; }
 .notice { padding: 12px 16px; background: #fff3cd; border: 1px solid #ffe69c; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+.alarm-panel { margin-top: 16px; background: #fff; border: 1px solid #dee2e6; border-radius: 7px; overflow: hidden; }
+#alarm-form { padding: 16px; }
+#alarm-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.alarm-inputs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 14px; margin-bottom: 14px; }
+.alarm-inputs input { margin-top: 6px; min-width: 0; }
+.alarm-status { margin: 0 0 14px; font-size: 14px; overflow-wrap: anywhere; }
+.alarm-status.active { color: #9a6700; font-weight: 600; }
+.alarm-help { margin: 12px 0 0; line-height: 1.7; }
+.alarm-alert { position: absolute; z-index: 100; bottom: 24px; left: 24px; right: 24px; padding: 22px 28px; border: 4px solid #ffc107; border-radius: 8px; background: #fff3cd; color: #332701; box-shadow: 0 4px 24px #0006; pointer-events: none; }
+.alarm-alert strong { display: block; font-size: 26px; margin-bottom: 6px; }
+.alarm-alert span { display: block; font-size: 40px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+.stage.alarm-active::after { content: ""; position: absolute; z-index: 101; inset: 0; border: 10px solid #ffc107; pointer-events: none; }
+.stop-alarm { position: absolute; z-index: 102; top: 10px; left: 10px; color: #332701; background: #fff3cd; border-color: #ffc107; box-shadow: 0 2px 6px #0003; }
+.stop-alarm:hover { background: #ffe69c; }
+.viewer .toolbar { flex-wrap: wrap; }
 footer { border-top: 1px solid #dee2e6; padding: 16px 24px; font-size: 12px; color: #6c757d; display: flex; gap: 16px; justify-content: space-between; }
 .viewer-only { display: none; }
 .viewer .editor-only { display: none; }
@@ -99,5 +114,6 @@ footer { border-top: 1px solid #dee2e6; padding: 16px 24px; font-size: 12px; col
   .stage-host { padding: 8px; }
   .viewer .stage-host { height: calc(100dvh - 280px); }
   .viewer-help { line-height: 1.7; }
+  .alarm-inputs { grid-template-columns: 1fr; }
   footer { flex-direction: column; gap: 5px; padding: 16px; }
 }

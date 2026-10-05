@@ -9,7 +9,9 @@ public record Element(Guid Id, string Kind, double X, double Y, double Width, do
     public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}" : null;
 }
 
-public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements);
+public record BoardAlarm(Guid Id, DateTimeOffset At, string Message);
+public record ScheduleAlarm(DateTimeOffset At, string? Message);
+public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, BoardAlarm? Alarm);
 public record CreateElement(string Kind);
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
     int? FontSize, string? Color, string? Align, bool? Visible)
@@ -48,6 +50,7 @@ public sealed class BoardStore
     private readonly Dictionary<Guid, ImageData> images = [];
     private readonly Dictionary<Guid, Channel<BoardSnapshot>> subscribers = [];
     private long revision;
+    private BoardAlarm? alarm;
 
     public BoardSnapshot Snapshot()
     {
@@ -137,7 +140,31 @@ public sealed class BoardStore
         lock (gate) return images.GetValueOrDefault(id);
     }
 
-    private BoardSnapshot SnapshotCore() => new(revision, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), elements.ToArray());
+    public BoardAlarm? SetAlarm(ScheduleAlarm request)
+    {
+        lock (gate)
+        {
+            if (request.At <= DateTimeOffset.UtcNow || request.Message?.Length > 120) return null;
+            alarm = new(Guid.NewGuid(), request.At.ToUniversalTime(),
+                string.IsNullOrWhiteSpace(request.Message) ? "設定した時刻になりました" : request.Message.Trim());
+            Publish();
+            return alarm;
+        }
+    }
+
+    public bool ClearAlarm(Guid id)
+    {
+        lock (gate)
+        {
+            // An old stop action must not cancel a newly scheduled alarm.
+            if (alarm?.Id != id) return false;
+            alarm = null;
+            Publish();
+            return true;
+        }
+    }
+
+    private BoardSnapshot SnapshotCore() => new(revision, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), elements.ToArray(), alarm);
 
     private void Publish()
     {
