@@ -77,6 +77,10 @@
             <label>幅<input id="width" type="number" min="80" max="1280"></label><label>高さ<input id="height" type="number" min="48" max="720"></label>
           </div>
           <label class="checkbox-label"><input id="visible" type="checkbox">画面に表示する</label>
+          <h3>表示予約</h3>
+          <div class="delay-inputs"><label>表示まで<input id="display-delay" type="number" min="1" max="86400" step="1" value="10"></label><label>単位<select id="display-unit"><option value="1">秒後</option><option value="60">分後</option></select></label></div>
+          <div class="button-group schedule-controls"><button id="schedule-display" type="button">表示を予約</button><button id="cancel-display" type="button" hidden>予約を解除</button></div>
+          <p id="display-status" class="muted"></p>
           <button id="delete-element" class="danger">要素を削除</button>
         </fieldset>
       </aside>

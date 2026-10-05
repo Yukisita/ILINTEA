@@ -5,7 +5,7 @@ namespace StreamPrompter;
 
 public record Element(Guid Id, string Kind, double X, double Y, double Width, double Height,
     string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
-    ScriptPlayback? Playback = null)
+    ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null)
 {
     public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}" : null;
 }
@@ -20,6 +20,8 @@ public record ScriptControl(string Action, double? Speed)
     public bool IsValid() => Action is "play" or "pause" or "reset" ||
         (Action == "speed" && Speed is >= 5 and <= 200);
 }
+public record DisplaySchedule(Guid Id, DateTimeOffset At);
+public record ScheduleDisplay(int DelaySeconds);
 
 public record BoardAlarm(Guid Id, DateTimeOffset At, string Message);
 public record ScheduleAlarm(DateTimeOffset At, string? Message);
@@ -118,6 +120,12 @@ public sealed class BoardStore
             var index = elements.FindIndex(element => element.Id == id);
             if (index < 0) return null;
             var current = elements[index];
+            var now = DateTimeOffset.UtcNow;
+            var playback = current.Playback;
+            if (patch.Visible is not null && current.DisplaySchedule?.At > now && playback?.StartedAt is not null)
+                playback = playback with { Offset = playback.PositionAt(now), StartedAt = patch.Visible.Value ? now : null };
+            if (patch.Text is not null && patch.Text != current.Text && playback is not null)
+                playback = playback with { Offset = 0, StartedAt = null };
             var width = Math.Clamp(patch.Width ?? current.Width, 80, 1280);
             var height = Math.Clamp(patch.Height ?? current.Height, 48, 720);
             var updated = current with
@@ -130,8 +138,8 @@ public sealed class BoardStore
                 Color = patch.Color ?? current.Color,
                 Align = patch.Align ?? current.Align,
                 Visible = patch.Visible ?? current.Visible,
-                Playback = patch.Text is not null && patch.Text != current.Text && current.Playback is { } playback
-                    ? playback with { Offset = 0, StartedAt = null } : current.Playback
+                Playback = playback,
+                DisplaySchedule = patch.Visible is not null ? null : current.DisplaySchedule
             };
             elements[index] = updated;
             Publish();
@@ -165,17 +173,53 @@ public sealed class BoardStore
             var playback = element.Playback!;
             var now = DateTimeOffset.UtcNow;
             var position = playback.PositionAt(now);
+            var start = element.DisplaySchedule?.At > now ? element.DisplaySchedule.At : now;
             playback = control.Action switch
             {
-                "play" => playback with { StartedAt = playback.StartedAt ?? now },
+                "play" => playback with { StartedAt = playback.StartedAt ?? start },
                 "pause" => playback with { Offset = position, StartedAt = null },
                 "reset" => playback with { Offset = 0, StartedAt = null },
-                "speed" => playback with { Speed = control.Speed!.Value, Offset = position, StartedAt = playback.StartedAt is null ? null : now },
+                "speed" => playback with { Speed = control.Speed!.Value, Offset = position, StartedAt = playback.StartedAt is null ? null : start },
                 _ => playback
             };
             elements[index] = element with { Playback = playback };
             Publish();
             return elements[index];
+        }
+    }
+
+    public Element? ScheduleDisplay(Guid id, int delaySeconds)
+    {
+        lock (gate)
+        {
+            var index = elements.FindIndex(element => element.Id == id);
+            if (index < 0) return null;
+            var element = elements[index];
+            var now = DateTimeOffset.UtcNow;
+            var schedule = new DisplaySchedule(Guid.NewGuid(), now.AddSeconds(delaySeconds));
+            var playback = element.Playback;
+            if (playback?.StartedAt is not null)
+                playback = playback with { Offset = playback.PositionAt(now), StartedAt = schedule.At };
+            elements[index] = element with { Visible = true, DisplaySchedule = schedule, Playback = playback };
+            Publish();
+            return elements[index];
+        }
+    }
+
+    public bool CancelDisplay(Guid id, Guid scheduleId)
+    {
+        lock (gate)
+        {
+            var index = elements.FindIndex(element => element.Id == id);
+            if (index < 0) return false;
+            var element = elements[index];
+            var now = DateTimeOffset.UtcNow;
+            if (element.DisplaySchedule?.Id != scheduleId || element.DisplaySchedule.At <= now) return false;
+            var playback = element.Playback;
+            if (playback is not null) playback = playback with { Offset = playback.PositionAt(now), StartedAt = null };
+            elements[index] = element with { Visible = false, DisplaySchedule = null, Playback = playback };
+            Publish();
+            return true;
         }
     }
 

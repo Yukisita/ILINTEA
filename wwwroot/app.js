@@ -18,6 +18,7 @@ let alarmSaving = false;
 let alarmFormDirty = false;
 let shownAlarmId = null;
 let scriptBusy = false;
+let displayBusy = false;
 const pending = new Map();
 const inFlight = new Map();
 const nodes = new Map();
@@ -49,7 +50,9 @@ async function request(path, options = {}) {
 }
 
 function effectiveElement(element) {
-    const result = { ...element, ...inFlight.get(element.id), ...pending.get(element.id) };
+    const patch = { ...inFlight.get(element.id), ...pending.get(element.id) };
+    const result = { ...element, ...patch };
+    if (typeof patch.visible === 'boolean') result.displaySchedule = null;
     result.width = Math.max(80, Math.min(1280, result.width));
     result.height = Math.max(48, Math.min(720, result.height));
     result.x = Math.max(0, Math.min(1280 - result.width, result.x));
@@ -147,7 +150,7 @@ function render() {
             nodes.set(element.id, node);
             $('stage').append(node);
         }
-        node.hidden = !element.visible;
+        node.hidden = !elementIsVisible(element);
         node.style.left = `${element.x}px`;
         node.style.top = `${element.y}px`;
         node.style.width = `${element.width}px`;
@@ -160,7 +163,7 @@ function render() {
         if (element.kind === 'script') {
             const script = node.firstElementChild.firstElementChild;
             if (script.textContent !== element.text) script.textContent = element.text;
-            if (element.visible) scriptLimits.set(element.id, Math.max(0, script.scrollHeight - element.height));
+            if (!node.hidden) scriptLimits.set(element.id, Math.max(0, script.scrollHeight - element.height));
         }
         if (!viewer) node.lastElementChild.hidden = element.id !== selectedId;
     }
@@ -184,7 +187,7 @@ function renderList() {
         const label = document.createElement('span');
         label.textContent = `${kinds[element.kind]}${['text', 'script'].includes(element.kind) ? ` · ${element.text.split('\n')[0] || '空欄'}` : ''}`;
         const visibility = document.createElement('small');
-        visibility.textContent = element.visible ? '表示' : '非表示';
+        visibility.textContent = displayIsWaiting(element) ? '予約中' : elementIsVisible(element) ? '表示' : '非表示';
         button.append(label, visibility);
         button.addEventListener('click', () => select(element.id));
         row.append(button);
@@ -206,11 +209,71 @@ function renderProperties() {
     $('type-fields').hidden = element.kind === 'image';
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);
-        if (document.activeElement === input) continue;
-        if (input.type === 'checkbox') input.checked = element[property];
+        if (document.activeElement === input && input.type !== 'checkbox') continue;
+        if (input.type === 'checkbox') input.checked = elementIsVisible(element);
         else input.value = element[property];
     }
     renderScriptControls();
+    renderDisplayControls();
+}
+
+function displayIsWaiting(element) {
+    return !!element.displaySchedule && Date.parse(element.displaySchedule.at) > Date.now() + serverOffset;
+}
+
+function elementIsVisible(element) {
+    return element.visible && !displayIsWaiting(element);
+}
+
+function updateScheduledVisibility() {
+    let changed = false;
+    for (const original of state.elements) {
+        const element = effectiveElement(original);
+        const node = nodes.get(element.id);
+        if (!node) continue;
+        const hidden = !elementIsVisible(element);
+        if (node.hidden === hidden) continue;
+        node.hidden = hidden;
+        if (!hidden && element.kind === 'script')
+            scriptLimits.set(element.id, Math.max(0, node.firstElementChild.firstElementChild.scrollHeight - element.height));
+        changed = true;
+    }
+    if (changed && !viewer) { renderList(); renderProperties(); }
+}
+
+function renderDisplayControls() {
+    const element = selectedElement();
+    if (viewer || !element) return;
+    const waiting = displayIsWaiting(element);
+    const busy = displayBusy || !connected || pending.has(element.id) || inFlight.has(element.id);
+    for (const id of ['display-delay', 'display-unit', 'schedule-display', 'cancel-display']) $(id).disabled = busy;
+    $('cancel-display').hidden = !waiting;
+    $('schedule-display').textContent = waiting ? '予約を置き換える' : '表示を予約';
+    $('visible').checked = elementIsVisible(element);
+    $('display-status').textContent = waiting
+        ? `あと${Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000)}秒で表示。解除すると非表示のままになります。`
+        : element.displaySchedule ? '予約時刻になったため表示しました。' : '予約すると、指定した時間まで非表示になります。';
+}
+
+async function scheduleDisplay(cancel = false) {
+    const element = selectedElement();
+    if (!element || !connected || displayBusy) return;
+    const seconds = Number($('display-delay').value) * Number($('display-unit').value);
+    if (!cancel && (!Number.isInteger(seconds) || seconds < 1 || seconds > 86400 || !$('display-delay').checkValidity())) {
+        notify('表示までの時間は1秒～24時間で指定してください。');
+        return;
+    }
+    if (cancel && !element.displaySchedule) return;
+    displayBusy = true;
+    renderDisplayControls();
+    try {
+        const path = `/api/elements/${element.id}/display-schedule`;
+        await request(cancel ? `${path}/${element.displaySchedule.id}` : path, cancel ? { method: 'DELETE' } : {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delaySeconds: seconds })
+        });
+        await refreshBoard();
+    } catch (error) { notify(error.message); }
+    finally { displayBusy = false; renderDisplayControls(); }
 }
 
 function scriptPosition(element) {
@@ -223,7 +286,8 @@ function renderScriptControls() {
     const element = selectedElement();
     if (viewer || element?.kind !== 'script') return;
     const limit = scriptLimits.get(element.id) ?? 0;
-    const ended = scriptPosition(element) >= limit;
+    const waiting = displayIsWaiting(element);
+    const ended = !waiting && scriptPosition(element) >= limit;
     const busy = !connected || scriptBusy || pending.has(element.id) || inFlight.has(element.id);
     const running = !!element.playback.startedAt;
     $('script-play').disabled = busy || running || ended;
@@ -234,7 +298,8 @@ function renderScriptControls() {
         $('script-speed').value = element.playback.speed;
         $('script-speed-value').textContent = `${element.playback.speed} px/秒`;
     }
-    const status = limit === 0 ? '原稿全体が表示枠に収まっています。'
+    const status = waiting ? (running ? '表示予約待ち・表示時刻から再生します' : '表示予約待ち・再生を選ぶと表示時刻から開始します')
+        : limit === 0 ? '原稿全体が表示枠に収まっています。'
         : ended ? '最後まで表示しました。「先頭へ」で戻せます。'
         : running ? '再生中・閲覧画面と同期しています' : '停止中';
     if ($('script-status').textContent !== status) $('script-status').textContent = status;
@@ -326,7 +391,9 @@ function updateClocks() {
         if (element.kind === 'clock') nodes.get(element.id).firstElementChild.textContent = time;
     }
     renderAlarm();
+    updateScheduledVisibility();
     renderScriptControls();
+    renderDisplayControls();
 }
 
 function localDateTimeValue(date) {
@@ -423,6 +490,9 @@ events.onerror = () => {
 };
 
 if (!viewer) {
+    $('schedule-display').addEventListener('click', () => scheduleDisplay());
+    $('cancel-display').addEventListener('click', () => scheduleDisplay(true));
+    $('display-unit').addEventListener('change', () => { $('display-delay').max = 86400 / Number($('display-unit').value); });
     $('add-script').addEventListener('click', () => $('script-file').click());
     $('script-file').addEventListener('change', async (event) => {
         const file = event.target.files[0];

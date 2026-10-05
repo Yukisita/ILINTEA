@@ -67,6 +67,17 @@ app.MapPatch("/api/elements/{id:guid}", (Guid id, ElementPatch patch, BoardStore
     return element is null ? Results.NotFound(new { error = "この要素は削除されています。" }) : Results.Ok(element);
 });
 
+app.MapPost("/api/elements/{id:guid}/display-schedule", (Guid id, ScheduleDisplay request, BoardStore board) =>
+{
+    if (request.DelaySeconds is < 1 or > 86400)
+        return Results.BadRequest(new { error = "表示までの時間は1秒～24時間で指定してください。" });
+    var element = board.ScheduleDisplay(id, request.DelaySeconds);
+    return element is null ? Results.NotFound(new { error = "この要素は削除されています。" }) : Results.Ok(element);
+});
+app.MapDelete("/api/elements/{id:guid}/display-schedule/{scheduleId:guid}", (Guid id, Guid scheduleId, BoardStore board) =>
+    board.CancelDisplay(id, scheduleId) ? Results.NoContent()
+        : Results.NotFound(new { error = "表示予約は変更・解除済みか、表示時刻を過ぎています。" }));
+
 app.MapDelete("/api/elements/{id:guid}", (Guid id, BoardStore board) =>
     board.Remove(id) ? Results.NoContent() : Results.NotFound(new { error = "この要素は削除されています。" }));
 
