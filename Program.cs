@@ -26,6 +26,13 @@ app.MapPut("/api/alarm", (ScheduleAlarm request, BoardStore board) =>
 app.MapDelete("/api/alarm/{id:guid}", (Guid id, BoardStore board) =>
     board.ClearAlarm(id) ? Results.NoContent() : Results.NotFound(new { error = "アラームは変更または解除されています。" }));
 
+app.MapGet("/api/viewer-url", (HttpRequest request) =>
+{
+    var url = ViewerLink.Create(request);
+    return url is null
+        ? Results.Json(new { error = "共有できるIPアドレスが見つかりません。Wi-Fiまたは有線LANの接続を確認してください。" }, statusCode: 503)
+        : Results.Ok(new { url });
+});
 app.MapGet("/api/events", async (HttpContext context, BoardStore board) =>
 {
     context.Response.ContentType = "text/event-stream";

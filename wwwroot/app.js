@@ -590,11 +590,15 @@ if (!viewer) {
         if (event.target === $('stage')) select(null);
     });
     $('copy-link').addEventListener('click', async () => {
-        const url = new URL('/view/', location.origin).href;
+        $('copy-link').disabled = true;
         try {
-            await navigator.clipboard.writeText(url);
-            notify('閲覧URLをコピーしました。別のブラウザーや端末で開いてください。');
-        } catch { window.prompt('この閲覧URLをコピーしてください。', url); }
+            const { url } = await request('/api/viewer-url');
+            try {
+                await navigator.clipboard.writeText(url);
+                notify('閲覧URLをコピーしました。同じLAN内の端末で開いてください。');
+            } catch { window.prompt('この閲覧URLをコピーして、別の端末で開いてください。', url); }
+        } catch (error) { notify(error.message); }
+        finally { $('copy-link').disabled = false; }
     });
     window.addEventListener('beforeunload', (event) => {
         if (pending.size || sending) { event.preventDefault(); event.returnValue = ''; }

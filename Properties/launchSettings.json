@@ -3,7 +3,7 @@
     "StreamPrompter": {
       "commandName": "Project",
       "launchBrowser": false,
-      "applicationUrl": "http://localhost:5280",
+      "applicationUrl": "http://0.0.0.0:5280",
       "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
     }
   }
