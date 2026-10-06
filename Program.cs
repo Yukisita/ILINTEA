@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Http.Features;
 using StreamPrompter;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddIniFile("StreamPrompter.ini", optional: false, reloadOnChange: false);
+if (!int.TryParse(builder.Configuration["Server:Port"], out var port) || port is < 1 or > 65535)
+    throw new InvalidOperationException("StreamPrompter.ini の [Server] Port は1～65535の整数で指定してください。");
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);

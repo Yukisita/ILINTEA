@@ -16,6 +16,8 @@ ASP.netを用いるwebアプリとする.
 
 .NET 10 SDKをインストールした環境で、リポジトリのフォルダーから実行します。
 
+起動時に `StreamPrompter.ini` の `[Server]` にある `Port` を読み込みます。初期値は5280です。1～65535の整数を指定し、変更後はサーバーを再起動してください。配布時にもiniファイルを同梱します。以下のURL例は初期値の場合です。
+
 ```powershell
 dotnet run --project StreamPrompter.csproj
 ```
