@@ -24,7 +24,16 @@ public record DisplaySchedule(Guid Id, DateTimeOffset At);
 public record ScheduleDisplay(int DelaySeconds);
 
 public record ScheduleAlarm(DateTimeOffset At);
-public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements);
+public record CanvasSettings(string AspectRatio = "16:9")
+{
+    public double Width => AspectRatio switch { "9:16" => 720, "3:4" => 960, _ => 1280 };
+    public double Height => AspectRatio switch { "16:9" => 720, "4:3" => 960, _ => 1280 };
+}
+public record CanvasPatch(string? AspectRatio)
+{
+    public bool IsValid() => AspectRatio is null or "16:9" or "4:3" or "1:1" or "3:4" or "9:16";
+}
+public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, CanvasSettings Canvas);
 public record CreateElement(string Kind, string? Text = null);
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
     int? FontSize, string? Color, string? Align, bool? Visible)
@@ -63,6 +72,7 @@ public sealed class BoardStore
     private readonly Dictionary<Guid, ImageData> images = [];
     private readonly Dictionary<Guid, Channel<BoardSnapshot>> subscribers = [];
     private long revision;
+    private CanvasSettings canvas = new();
 
     public BoardSnapshot Snapshot()
     {
@@ -105,6 +115,7 @@ public sealed class BoardStore
                 "alarm" => new Element(Guid.NewGuid(), kind, 80, 520, 960, 160, "設定した時刻になりました", 40, "#332701"),
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "ここにテキストを入力", 56)
             }) with { Visible = false };
+            element = ScaleElement(element, canvas.Width / 1280, canvas.Height / 720);
             elements.Add(element);
             if (image is not null) images.Add(element.Id, image);
             Publish();
@@ -125,12 +136,12 @@ public sealed class BoardStore
                 playback = playback with { Offset = playback.PositionAt(now), StartedAt = patch.Visible.Value ? now : null };
             if (patch.Text is not null && patch.Text != current.Text && playback is not null)
                 playback = playback with { Offset = 0, StartedAt = null };
-            var width = Math.Clamp(patch.Width ?? current.Width, 80, 1280);
-            var height = Math.Clamp(patch.Height ?? current.Height, 48, 720);
+            var width = Math.Clamp(patch.Width ?? current.Width, 80, canvas.Width);
+            var height = Math.Clamp(patch.Height ?? current.Height, 48, canvas.Height);
             var updated = current with
             {
-                X = Math.Clamp(patch.X ?? current.X, 0, 1280 - width),
-                Y = Math.Clamp(patch.Y ?? current.Y, 0, 720 - height),
+                X = Math.Clamp(patch.X ?? current.X, 0, canvas.Width - width),
+                Y = Math.Clamp(patch.Y ?? current.Y, 0, canvas.Height - height),
                 Width = width, Height = height,
                 Text = patch.Text ?? current.Text,
                 FontSize = patch.FontSize ?? current.FontSize,
@@ -239,7 +250,34 @@ public sealed class BoardStore
         }
     }
 
-    private BoardSnapshot SnapshotCore() => new(revision, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), elements.ToArray());
+    public CanvasSettings UpdateCanvas(CanvasPatch patch)
+    {
+        lock (gate)
+        {
+            var updated = canvas with { AspectRatio = patch.AspectRatio ?? canvas.AspectRatio };
+            if (updated == canvas) return canvas;
+            var scaleX = updated.Width / canvas.Width;
+            var scaleY = updated.Height / canvas.Height;
+            canvas = updated;
+            for (var i = 0; i < elements.Count; i++) elements[i] = ScaleElement(elements[i], scaleX, scaleY);
+            Publish();
+            return canvas;
+        }
+    }
+
+    private Element ScaleElement(Element element, double scaleX, double scaleY)
+    {
+        var width = Math.Clamp(element.Width * scaleX, 80, canvas.Width);
+        var height = Math.Clamp(element.Height * scaleY, 48, canvas.Height);
+        return element with
+        {
+            X = Math.Clamp(element.X * scaleX, 0, canvas.Width - width),
+            Y = Math.Clamp(element.Y * scaleY, 0, canvas.Height - height),
+            Width = width, Height = height
+        };
+    }
+
+    private BoardSnapshot SnapshotCore() => new(revision, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), elements.ToArray(), canvas);
 
     private void Publish()
     {

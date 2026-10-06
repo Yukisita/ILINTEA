@@ -19,7 +19,7 @@
     <div id="notice" class="notice" role="alert" hidden></div>
     <div class="toolbar editor-only">
       <div class="button-group"><button id="add-clock" disabled>＋ 時計</button><button id="add-text" disabled>＋ テキスト</button><button id="add-alarm" disabled>＋ アラーム</button><button id="add-image" disabled>＋ 画像</button><button id="add-script" disabled>＋ TXTファイル</button><input id="image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden><input id="script-file" type="file" accept=".txt,text/plain" hidden></div>
-      <span class="muted">16:9 <span class="canvas-size">／ 1280 × 720</span></span>
+      <div class="canvas-settings"><label for="aspect-ratio">画面比率</label><select id="aspect-ratio" disabled><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="3:4">3:4（縦）</option><option value="9:16">9:16（縦）</option></select></div>
     </div>
     <div class="toolbar viewer-only">
       <span id="viewer-alarm-status" class="muted"></span><div class="button-group"><button id="flip-x" aria-pressed="false">↔ 左右反転</button><button id="flip-y" aria-pressed="false">↕ 上下反転</button><button id="fullscreen">⛶ 全画面</button></div>

@@ -21,6 +21,9 @@ let shownAlarmId = null;
 let scriptBusy = false;
 let displayBusy = false;
 let deleteConfirmId = null;
+let canvasSaving = false;
+const canvasWidth = () => state.canvas?.width ?? 1280;
+const canvasHeight = () => state.canvas?.height ?? 720;
 const pending = new Map();
 const inFlight = new Map();
 const nodes = new Map();
@@ -57,10 +60,10 @@ function effectiveElement(element) {
     const patch = { ...inFlight.get(element.id), ...pending.get(element.id) };
     const result = { ...element, ...patch };
     if (typeof patch.visible === 'boolean') result.displaySchedule = null;
-    result.width = Math.max(80, Math.min(1280, result.width));
-    result.height = Math.max(48, Math.min(720, result.height));
-    result.x = Math.max(0, Math.min(1280 - result.width, result.x));
-    result.y = Math.max(0, Math.min(720 - result.height, result.y));
+    result.width = Math.max(80, Math.min(canvasWidth(), result.width));
+    result.height = Math.max(48, Math.min(canvasHeight(), result.height));
+    result.x = Math.max(0, Math.min(canvasWidth() - result.width, result.x));
+    result.y = Math.max(0, Math.min(canvasHeight() - result.height, result.y));
     return result;
 }
 
@@ -70,7 +73,7 @@ function selectedElement() {
 }
 
 function queuePatch(id, patch) {
-    if (!connected || !state.elements.some((element) => element.id === id)) return;
+    if (!connected || canvasSaving || !state.elements.some((element) => element.id === id)) return;
     if (deleteConfirmId === id) deleteConfirmId = null;
     pending.set(id, { ...pending.get(id), ...patch });
     $('save-status').textContent = '反映中…';
@@ -172,6 +175,8 @@ function renderElement(node, element, editable, limits) {
 }
 
 function render() {
+    resizeStage();
+    if (!viewer) renderCanvasControls();
     const liveIds = new Set(state.elements.map((element) => element.id));
     if (selectedId && !liveIds.has(selectedId)) selectedId = null;
     for (const collection of [nodes, programNodes]) {
@@ -235,10 +240,14 @@ function renderList() {
 function renderProperties() {
     const element = selectedElement();
     $('property-fields').hidden = !element;
-    $('property-fields').disabled = !connected;
+    $('property-fields').disabled = !connected || canvasSaving;
     $('selection-empty').hidden = !!element;
     $('property-title').textContent = element ? `${kinds[element.kind]}設定` : '要素の設定';
     if (!element) return;
+    $('x').max = canvasWidth() - element.width;
+    $('y').max = canvasHeight() - element.height;
+    $('width').max = canvasWidth();
+    $('height').max = canvasHeight();
     $('text-fields').hidden = !['text', 'script', 'alarm'].includes(element.kind);
     $('text-label').textContent = element.kind === 'alarm' ? '通知メッセージ' : 'テキスト内容';
     $('text').maxLength = element.kind === 'script' ? 50000 : 4000;
@@ -433,7 +442,7 @@ async function controlScript(action, speed) {
 }
 
 function startGesture(event) {
-    if (!connected || event.button !== 0 || gesture) return;
+    if (!connected || canvasSaving || event.button !== 0 || gesture) return;
     const node = event.currentTarget;
     const element = state.elements.find((item) => item.id === node.dataset.id);
     if (!element) return;
@@ -453,11 +462,11 @@ function moveGesture(event) {
     const { element, id, resize } = gesture;
     const clamp = (value, min, max) => Math.round(Math.max(min, Math.min(max, value)));
     queuePatch(id, resize ? {
-        width: clamp(element.width + dx, 80, 1280 - element.x),
-        height: clamp(element.height + dy, 48, 720 - element.y)
+        width: clamp(element.width + dx, 80, canvasWidth() - element.x),
+        height: clamp(element.height + dy, 48, canvasHeight() - element.y)
     } : {
-        x: clamp(element.x + dx, 0, 1280 - element.width),
-        y: clamp(element.y + dy, 0, 720 - element.height)
+        x: clamp(element.x + dx, 0, canvasWidth() - element.width),
+        y: clamp(element.y + dy, 0, canvasHeight() - element.height)
     });
     // Limit live drag updates to about ten per second without waiting for the drag to finish.
     if (!sending && performance.now() - (gesture.lastSent || 0) > 100) {
@@ -479,9 +488,12 @@ function fitStage(hostId, viewportId, stageId, output = false) {
     const availableWidth = host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     const availableHeight = host.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
     const fitHeight = viewer || document.fullscreenElement || style.getPropertyValue('--fit-stage-height').trim() === '1';
-    const scale = Math.max(.01, Math.min(availableWidth / 1280, fitHeight ? availableHeight / 720 : Infinity));
-    $(viewportId).style.width = `${1280 * scale}px`;
-    $(viewportId).style.height = `${720 * scale}px`;
+    const width = canvasWidth(), height = canvasHeight();
+    const scale = Math.max(.01, Math.min(availableWidth / width, fitHeight ? availableHeight / height : Infinity));
+    $(viewportId).style.width = `${width * scale}px`;
+    $(viewportId).style.height = `${height * scale}px`;
+    $(stageId).style.width = `${width}px`;
+    $(stageId).style.height = `${height}px`;
     $(stageId).style.transform = `scale(${scale})`;
     $(viewportId).style.transform = viewer ? `scale(${flipX ? -1 : 1}, ${flipY ? -1 : 1})` : '';
     if (!output) stageScale = scale;
@@ -566,12 +578,31 @@ function acceptState(snapshot) {
 
 async function refreshBoard() { acceptState(await request('/api/board')); }
 
+function renderCanvasControls() {
+    $('aspect-ratio').value = state.canvas?.aspectRatio ?? '16:9';
+    $('aspect-ratio').disabled = !connected || canvasSaving || sending || pending.size > 0 || !!gesture;
+}
+
+async function updateCanvas(patch) {
+    if (!connected || canvasSaving || sending || pending.size || gesture) return;
+    canvasSaving = true;
+    render();
+    try {
+        await request('/api/canvas', {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
+        });
+        await refreshBoard();
+    } catch (error) { notify(error.message); }
+    finally { canvasSaving = false; render(); }
+}
+
 function setConnection(value) {
     connected = value;
     $('connection').textContent = value ? '同期中' : '再接続中…';
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
     for (const id of ['add-clock', 'add-text', 'add-image', 'add-script', 'add-alarm']) $(id).disabled = !value;
-    $('property-fields').disabled = !value;
+    $('property-fields').disabled = !value || canvasSaving;
+    if (!viewer) renderCanvasControls();
     renderAlarm();
 }
 
@@ -593,6 +624,7 @@ events.onerror = () => {
 };
 
 if (!viewer) {
+    $('aspect-ratio').addEventListener('change', () => updateCanvas({ aspectRatio: $('aspect-ratio').value }));
     $('show-element').addEventListener('click', () => setElementVisibility(true));
     $('hide-element').addEventListener('click', () => setElementVisibility(false));
     $('schedule-display').addEventListener('click', () => scheduleDisplay());
