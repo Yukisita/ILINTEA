@@ -27,7 +27,7 @@ const nodes = new Map();
 const programNodes = new Map();
 const scriptLimits = new Map();
 const programScriptLimits = new Map();
-const kinds = { text: 'テキスト', clock: '時計', image: '画像', script: 'TXT原稿' };
+const kinds = { text: 'テキスト', clock: '時計', image: '画像', script: 'TXT原稿', alarm: 'アラーム' };
 const fields = { text: 'text', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height' };
 let flipX = false;
 let flipY = false;
@@ -105,6 +105,8 @@ async function flushPending() {
 function select(id) {
     if (id !== selectedId) {
         deleteConfirmId = null;
+        alarmFormDirty = false;
+        shownAlarmId = null;
     }
     if (id !== selectedId && $('property-fields').contains(document.activeElement)) document.activeElement.blur();
     selectedId = id;
@@ -115,6 +117,7 @@ function createElementNode(element, editable) {
     const node = document.createElement('div');
     node.className = `element element-${element.kind}`;
     node.dataset.id = element.id;
+    if (element.kind === 'alarm' && !editable) node.setAttribute('role', 'alert');
     const content = document.createElement('div');
     content.className = 'element-content';
     if (element.kind === 'script') {
@@ -158,6 +161,8 @@ function renderElement(node, element, editable, limits) {
     node.style.textAlign = element.align;
     node.classList.toggle('selected', editable && element.id === selectedId);
     if (element.kind === 'text') node.firstElementChild.textContent = element.text;
+    if (element.kind === 'alarm' && node.firstElementChild.textContent !== element.text)
+        node.firstElementChild.textContent = element.text;
     if (element.kind === 'script') {
         const script = node.firstElementChild.firstElementChild;
         if (script.textContent !== element.text) script.textContent = element.text;
@@ -216,7 +221,7 @@ function renderList() {
         button.type = 'button';
         button.setAttribute('aria-pressed', String(element.id === selectedId));
         const label = document.createElement('span');
-        label.textContent = `${kinds[element.kind]}${['text', 'script'].includes(element.kind) ? ` · ${element.text.split('\n')[0] || '空欄'}` : ''}`;
+        label.textContent = `${kinds[element.kind]}${['text', 'script', 'alarm'].includes(element.kind) ? ` · ${element.text.split('\n')[0] || '空欄'}` : ''}`;
         const visibility = document.createElement('small');
         visibility.textContent = displayIsWaiting(element) ? '予約中' : elementIsVisible(element) ? '表示' : '非表示';
         button.append(label, visibility);
@@ -234,7 +239,8 @@ function renderProperties() {
     $('selection-empty').hidden = !!element;
     $('property-title').textContent = element ? `${kinds[element.kind]}設定` : '要素の設定';
     if (!element) return;
-    $('text-fields').hidden = !['text', 'script'].includes(element.kind);
+    $('text-fields').hidden = !['text', 'script', 'alarm'].includes(element.kind);
+    $('text-label').textContent = element.kind === 'alarm' ? '通知メッセージ' : 'テキスト内容';
     $('text').maxLength = element.kind === 'script' ? 50000 : 4000;
     $('script-fields').hidden = element.kind !== 'script';
     $('type-fields').hidden = element.kind === 'image';
@@ -283,7 +289,21 @@ function renderDisplayControls() {
     if (viewer || !element) return;
     const waiting = displayIsWaiting(element);
     const visible = elementIsVisible(element);
+    const alarm = element.kind === 'alarm';
     const busy = displayBusy || scriptBusy || !connected || pending.has(element.id) || inFlight.has(element.id);
+    $('display-schedule-fields').hidden = alarm;
+    $('alarm-settings').hidden = !alarm;
+    $('alarm-at').disabled = busy || visible;
+    $('schedule-alarm').disabled = busy || visible;
+    $('schedule-alarm').textContent = waiting ? '通知予約を変更' : '通知を予約';
+    if (alarm) {
+        const alarmKey = `${element.id}/${element.displaySchedule?.id ?? ''}`;
+        if (shownAlarmId !== alarmKey && !alarmFormDirty) {
+            shownAlarmId = alarmKey;
+            $('alarm-at').value = localDateTimeValue(element.displaySchedule
+                ? new Date(element.displaySchedule.at) : new Date(Date.now() + serverOffset + 5 * 60_000));
+        }
+    }
     for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || visible;
     $('show-element').disabled = busy || visible;
     $('hide-element').disabled = busy || !visible;
@@ -298,7 +318,10 @@ function renderDisplayControls() {
     const status = `Program：${waiting ? '予約中' : visible ? '表示中' : '非表示'}`;
     if ($('display-state').textContent !== status) $('display-state').textContent = status;
     $('display-state').className = `display-state ${waiting ? 'waiting' : visible ? 'visible' : ''}`;
-    $('display-status').textContent = waiting
+    $('display-status').textContent = alarm
+        ? waiting ? `通知予約：${alarmFormatter.format(new Date(element.displaySchedule.at))}。解除後も非表示です。`
+            : visible ? '通知中。再予約する場合は先に非表示にしてください。' : '指定時刻にProgramへ表示します。音は鳴りません。'
+        : waiting
         ? `あと${Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000)}秒で表示。解除後も非表示です。`
         : visible ? '予約する場合は、先に非表示にしてください。' : '予約時刻までは非表示のままです。';
 }
@@ -327,6 +350,26 @@ async function scheduleDisplay(cancel = false) {
         await request(cancel ? `${path}/${element.displaySchedule.id}` : path, cancel ? { method: 'DELETE' } : {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delaySeconds: seconds })
         });
+        await refreshBoard();
+    } catch (error) { notify(error.message); }
+    finally { displayBusy = false; renderDisplayControls(); }
+}
+
+async function scheduleAlarm() {
+    const element = selectedElement();
+    if (element?.kind !== 'alarm' || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id) || elementIsVisible(element)) return;
+    const date = new Date($('alarm-at').value);
+    if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
+        notify('通知日時は未来の日時を指定してください。');
+        return;
+    }
+    displayBusy = true;
+    renderDisplayControls();
+    try {
+        await request(`/api/elements/${element.id}/alarm`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ at: date.toISOString() })
+        });
+        alarmFormDirty = false;
         await refreshBoard();
     } catch (error) { notify(error.message); }
     finally { displayBusy = false; renderDisplayControls(); }
@@ -473,47 +516,31 @@ function localDateTimeValue(date) {
 }
 
 function renderAlarm() {
-    const alarm = state.alarm;
-    const active = !!alarm && Date.now() + serverOffset >= Date.parse(alarm.at);
-    const when = alarm ? alarmFormatter.format(new Date(alarm.at)) : '';
-    const text = !alarm ? 'アラームは設定されていません。'
-        : `${active ? '通知中' : '設定済み'}：${when} — ${alarm.message}`;
-    // Avoid repeatedly announcing an unchanged status to assistive technology.
-    if ($('alarm-status').textContent !== text) $('alarm-status').textContent = text;
-    $('alarm-status').classList.toggle('active', active);
-    $('viewer-alarm-status').textContent = alarm ? `アラーム ${when}${active ? '・通知中' : ''}` : '出演者用';
-    const alertText = active ? alarm.message : '';
-    if ($('alarm-alert-message').textContent !== alertText) $('alarm-alert-message').textContent = alertText;
-    $('alarm-alert').hidden = !active;
-    $('stage').classList.toggle('alarm-active', active);
-    if (!viewer) {
-        $('program-alarm-alert-message').textContent = alertText;
-        $('program-alarm-alert').hidden = !active;
-        $('program-stage').classList.toggle('alarm-active', active);
-    }
-    $('stop-alarm').hidden = !active;
+    const alarms = state.elements.filter((element) => element.kind === 'alarm');
+    const active = alarms.filter(elementIsVisible);
+    const waiting = alarms.filter(displayIsWaiting);
+    $('viewer-alarm-status').textContent = active.length ? `アラーム ${active.length}件・通知中`
+        : waiting.length ? `アラーム ${waiting.length}件・予約中` : '出演者用';
+    $('stop-alarm').hidden = active.length === 0;
+    $('stop-alarm').textContent = active.length > 1 ? '通知をすべて止める' : '通知を止める';
     $('stop-alarm').disabled = !connected || alarmSaving;
-    $('alarm-fields').disabled = !connected || alarmSaving;
-    $('cancel-alarm').hidden = !alarm;
-    $('cancel-alarm').textContent = active ? '通知を止める' : '解除する';
-    $('schedule-alarm').textContent = alarm ? '設定を置き換える' : '設定する';
-    const id = alarm?.id ?? '';
-    if (shownAlarmId !== id) {
-        shownAlarmId = id;
-        if (!alarmFormDirty) {
-            $('alarm-at').value = localDateTimeValue(alarm ? new Date(alarm.at) : new Date(Date.now() + serverOffset + 5 * 60_000));
-            $('alarm-message').value = alarm?.message ?? '';
-        }
-    }
 }
 
 async function clearAlarm() {
-    if (!connected || alarmSaving || !state.alarm) return;
-    const id = state.alarm.id;
+    if (!connected || alarmSaving) return;
+    const alarms = state.elements.filter((element) => element.kind === 'alarm' && elementIsVisible(element));
+    if (!alarms.length) return;
     alarmSaving = true;
     renderAlarm();
     try {
-        await request(`/api/alarm/${id}`, { method: 'DELETE' });
+        for (const element of alarms) {
+            // The schedule ID prevents an old stop action from cancelling a newer reservation.
+            await request(element.displaySchedule
+                ? `/api/elements/${element.id}/display-schedule/${element.displaySchedule.id}`
+                : `/api/elements/${element.id}`, element.displaySchedule ? { method: 'DELETE' } : {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visible: false })
+                });
+        }
         await refreshBoard();
     } catch (error) { notify(error.message); }
     finally { alarmSaving = false; renderAlarm(); }
@@ -543,7 +570,7 @@ function setConnection(value) {
     connected = value;
     $('connection').textContent = value ? '同期中' : '再接続中…';
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
-    for (const id of ['add-clock', 'add-text', 'add-image', 'add-script']) $(id).disabled = !value;
+    for (const id of ['add-clock', 'add-text', 'add-image', 'add-script', 'add-alarm']) $(id).disabled = !value;
     $('property-fields').disabled = !value;
     renderAlarm();
 }
@@ -596,31 +623,11 @@ if (!viewer) {
     $('script-reset').addEventListener('click', () => controlScript('reset'));
     $('script-speed').addEventListener('input', () => { $('script-speed-value').textContent = `${$('script-speed').value} px/秒`; });
     $('script-speed').addEventListener('change', () => controlScript('speed', Number($('script-speed').value)));
-    $('alarm-form').addEventListener('input', () => { alarmFormDirty = true; });
-    $('alarm-form').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        if (!connected || alarmSaving) return;
-        const date = new Date($('alarm-at').value);
-        if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
-            notify('アラームは未来の日時を指定してください。');
-            return;
-        }
-        alarmSaving = true;
-        renderAlarm();
-        try {
-            await request('/api/alarm', {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ at: date.toISOString(), message: $('alarm-message').value })
-            });
-            alarmFormDirty = false;
-            shownAlarmId = null;
-            await refreshBoard();
-        } catch (error) { notify(error.message); }
-        finally { alarmSaving = false; renderAlarm(); }
-    });
-    $('cancel-alarm').addEventListener('click', clearAlarm);
+    $('alarm-at').addEventListener('input', () => { alarmFormDirty = true; });
+    $('schedule-alarm').addEventListener('click', scheduleAlarm);
     $('add-clock').addEventListener('click', () => addElement('clock'));
     $('add-text').addEventListener('click', () => addElement('text'));
+    $('add-alarm').addEventListener('click', () => addElement('alarm'));
     $('add-image').addEventListener('click', () => $('image-file').click());
     $('image-file').addEventListener('change', async (event) => {
         const file = event.target.files[0];

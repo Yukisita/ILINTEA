@@ -71,6 +71,11 @@ button.primary:hover:not(:disabled) { background: #0b5ed7; }
 #delete-confirmation { display: flex; justify-content: end; align-items: center; gap: 6px; flex-wrap: wrap; }
 #delete-confirmation span { flex: 1; text-align: left; font-size: 11px; }
 .element-clock { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.element-alarm { padding: 12px 18px; border: 4px solid #ffc107; border-radius: 8px; background: #fff3cd; box-shadow: 0 4px 16px #0006; }
+.element-alarm .element-content::before { content: "アラーム"; display: block; font-size: .6em; font-weight: 700; margin-bottom: 6px; }
+#alarm-settings label { display: flex; align-items: center; justify-content: space-between; }
+#alarm-at { margin-top: 6px; }
+#schedule-alarm { margin-top: 8px; font-size: 13px; }
 .element img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 body:not(.viewer) #stage .element { cursor: move; touch-action: none; user-select: none; }
 body:not(.viewer) #stage .element.off-air { outline: 2px dashed #ffc107; }
@@ -106,18 +111,6 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid #e9ecef; paddin
 .element-row > button span { flex: 1; }
 .element-row small { flex: none; color: #6c757d; }
 .notice { padding: 12px 16px; background: #fff3cd; border: 1px solid #ffe69c; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
-.alarm-panel { margin-top: 16px; background: #fff; border: 1px solid #dee2e6; border-radius: 7px; overflow: hidden; }
-#alarm-form { padding: 16px; }
-#alarm-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
-.alarm-inputs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 14px; margin-bottom: 14px; }
-.alarm-inputs input { margin-top: 6px; min-width: 0; }
-.alarm-status { margin: 0 0 14px; font-size: 14px; overflow-wrap: anywhere; }
-.alarm-status.active { color: #9a6700; font-weight: 600; }
-.alarm-help { margin: 12px 0 0; line-height: 1.7; }
-.alarm-alert { position: absolute; z-index: 100; bottom: 24px; left: 24px; right: 24px; padding: 22px 28px; border: 4px solid #ffc107; border-radius: 8px; background: #fff3cd; color: #332701; box-shadow: 0 4px 24px #0006; pointer-events: none; }
-.alarm-alert strong { display: block; font-size: 26px; margin-bottom: 6px; }
-.alarm-alert span { display: block; font-size: 40px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
-.stage.alarm-active::after { content: ""; position: absolute; z-index: 101; inset: 0; border: 10px solid #ffc107; pointer-events: none; }
 .stop-alarm { position: absolute; z-index: 102; top: 10px; left: 10px; color: #332701; background: #fff3cd; border-color: #ffc107; box-shadow: 0 2px 6px #0003; }
 .stop-alarm:hover { background: #ffe69c; }
 .viewer .toolbar { flex-wrap: wrap; }
@@ -174,15 +167,6 @@ footer { border-top: 1px solid #dee2e6; padding: 16px 24px; font-size: 12px; col
   .delay-inputs button { grid-column: auto; }
   body:not(.viewer) .schedule-status button { padding: 5px 8px; font-size: 12px; }
   .delete-actions { margin-top: 10px; padding-top: 10px; }
-  .alarm-panel { flex: none; margin: 0; }
-  .alarm-panel .panel-heading { padding: 9px 12px; }
-  #alarm-form { padding: 10px 12px; }
-  #alarm-fields { display: flex; align-items: end; gap: 12px; }
-  .alarm-inputs { flex: 1; min-width: 0; gap: 10px; margin: 0; grid-template-columns: minmax(215px, 1fr) minmax(0, 1.3fr); }
-  .alarm-inputs input { font-size: 13px; padding: 6px 8px; margin-top: 4px; }
-  #alarm-fields > .button-group { flex: none; max-width: 130px; gap: 6px; flex-wrap: wrap; justify-content: end; }
-  .alarm-status { font-size: 12px; margin-bottom: 8px; }
-  .alarm-help { font-size: 11px; margin-top: 8px; line-height: 1.5; }
   body:not(.viewer) .notice { position: fixed; z-index: 200; top: 58px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); box-shadow: 0 3px 12px #0002; }
   body:not(.viewer) footer { flex: none; padding: 8px 16px; }
 }
@@ -208,6 +192,5 @@ footer { border-top: 1px solid #dee2e6; padding: 16px 24px; font-size: 12px; col
   .stage-host { padding: 8px; }
   .viewer .stage-host { height: calc(100dvh - 280px); }
   .viewer-help { line-height: 1.7; }
-  .alarm-inputs { grid-template-columns: 1fr; }
   footer { flex-direction: column; gap: 5px; padding: 16px; }
 }

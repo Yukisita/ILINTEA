@@ -23,9 +23,8 @@ public record ScriptControl(string Action, double? Speed)
 public record DisplaySchedule(Guid Id, DateTimeOffset At);
 public record ScheduleDisplay(int DelaySeconds);
 
-public record BoardAlarm(Guid Id, DateTimeOffset At, string Message);
-public record ScheduleAlarm(DateTimeOffset At, string? Message);
-public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, BoardAlarm? Alarm);
+public record ScheduleAlarm(DateTimeOffset At);
+public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements);
 public record CreateElement(string Kind, string? Text = null);
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
     int? FontSize, string? Color, string? Align, bool? Visible)
@@ -64,7 +63,6 @@ public sealed class BoardStore
     private readonly Dictionary<Guid, ImageData> images = [];
     private readonly Dictionary<Guid, Channel<BoardSnapshot>> subscribers = [];
     private long revision;
-    private BoardAlarm? alarm;
 
     public BoardSnapshot Snapshot()
     {
@@ -104,6 +102,7 @@ public sealed class BoardStore
                 "clock" => new Element(Guid.NewGuid(), kind, 880, 24, 368, 88, Align: "right"),
                 "image" => new Element(Guid.NewGuid(), kind, 80, 440, 240, 180),
                 "script" => new Element(Guid.NewGuid(), kind, 80, 140, 1120, 420, text ?? "", 48, Playback: new()),
+                "alarm" => new Element(Guid.NewGuid(), kind, 80, 520, 960, 160, "設定した時刻になりました", 40, "#332701"),
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "ここにテキストを入力", 56)
             }) with { Visible = false };
             elements.Add(element);
@@ -214,7 +213,8 @@ public sealed class BoardStore
             if (index < 0) return false;
             var element = elements[index];
             var now = DateTimeOffset.UtcNow;
-            if (element.DisplaySchedule?.Id != scheduleId || element.DisplaySchedule.At <= now) return false;
+            if (element.DisplaySchedule?.Id != scheduleId ||
+                (element.Kind != "alarm" && element.DisplaySchedule.At <= now)) return false;
             var playback = element.Playback;
             if (playback is not null) playback = playback with { Offset = playback.PositionAt(now), StartedAt = null };
             elements[index] = element with { Visible = false, DisplaySchedule = null, Playback = playback };
@@ -223,31 +223,23 @@ public sealed class BoardStore
         }
     }
 
-    public BoardAlarm? SetAlarm(ScheduleAlarm request)
+    public Element? ScheduleAlarm(Guid id, ScheduleAlarm request)
     {
         lock (gate)
         {
-            if (request.At <= DateTimeOffset.UtcNow || request.Message?.Length > 120) return null;
-            alarm = new(Guid.NewGuid(), request.At.ToUniversalTime(),
-                string.IsNullOrWhiteSpace(request.Message) ? "設定した時刻になりました" : request.Message.Trim());
+            var index = elements.FindIndex(element => element.Id == id && element.Kind == "alarm");
+            if (index < 0 || request.At <= DateTimeOffset.UtcNow) return null;
+            elements[index] = elements[index] with
+            {
+                Visible = true,
+                DisplaySchedule = new(Guid.NewGuid(), request.At.ToUniversalTime())
+            };
             Publish();
-            return alarm;
+            return elements[index];
         }
     }
 
-    public bool ClearAlarm(Guid id)
-    {
-        lock (gate)
-        {
-            // An old stop action must not cancel a newly scheduled alarm.
-            if (alarm?.Id != id) return false;
-            alarm = null;
-            Publish();
-            return true;
-        }
-    }
-
-    private BoardSnapshot SnapshotCore() => new(revision, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), elements.ToArray(), alarm);
+    private BoardSnapshot SnapshotCore() => new(revision, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), elements.ToArray());
 
     private void Publish()
     {

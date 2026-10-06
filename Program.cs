@@ -16,16 +16,6 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapGet("/api/board", (BoardStore board) => board.Snapshot());
-app.MapPut("/api/alarm", (ScheduleAlarm request, BoardStore board) =>
-{
-    var alarm = board.SetAlarm(request);
-    return alarm is null
-        ? Results.BadRequest(new { error = "未来の日時と120文字以内のメッセージを指定してください。" })
-        : Results.Ok(alarm);
-});
-app.MapDelete("/api/alarm/{id:guid}", (Guid id, BoardStore board) =>
-    board.ClearAlarm(id) ? Results.NoContent() : Results.NotFound(new { error = "アラームは変更または解除されています。" }));
-
 app.MapGet("/api/viewer-url", (HttpRequest request) =>
 {
     var url = ViewerLink.Create(request);
@@ -52,7 +42,7 @@ app.MapGet("/api/events", async (HttpContext context, BoardStore board) =>
 
 app.MapPost("/api/elements", (CreateElement request, BoardStore board) =>
 {
-    if (request.Kind is not ("text" or "clock" or "script"))
+    if (request.Kind is not ("text" or "clock" or "script" or "alarm"))
         return Results.BadRequest(new { error = "追加する要素の種類を確認してください。" });
     if (request.Kind == "script" && (string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 50000))
         return Results.BadRequest(new { error = "TXT原稿は1～50,000文字で指定してください。" });
@@ -72,6 +62,14 @@ app.MapPatch("/api/elements/{id:guid}", (Guid id, ElementPatch patch, BoardStore
     if (!patch.IsValid()) return Results.BadRequest(new { error = "設定値を確認してください。" });
     var element = board.Update(id, patch);
     return element is null ? Results.NotFound(new { error = "この要素は削除されています。" }) : Results.Ok(element);
+});
+
+app.MapPut("/api/elements/{id:guid}/alarm", (Guid id, ScheduleAlarm request, BoardStore board) =>
+{
+    if (request.At <= DateTimeOffset.UtcNow)
+        return Results.BadRequest(new { error = "通知日時は未来の日時を指定してください。" });
+    var element = board.ScheduleAlarm(id, request);
+    return element is null ? Results.NotFound(new { error = "このアラームは削除されています。" }) : Results.Ok(element);
 });
 
 app.MapPost("/api/elements/{id:guid}/display-schedule", (Guid id, ScheduleDisplay request, BoardStore board) =>
