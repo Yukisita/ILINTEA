@@ -520,7 +520,7 @@ function renderAlarm() {
     const active = alarms.filter(elementIsVisible);
     const waiting = alarms.filter(displayIsWaiting);
     $('viewer-alarm-status').textContent = active.length ? `アラーム ${active.length}件・通知中`
-        : waiting.length ? `アラーム ${waiting.length}件・予約中` : '出演者用';
+        : waiting.length ? `アラーム ${waiting.length}件・予約中` : '';
     $('stop-alarm').hidden = active.length === 0;
     $('stop-alarm').textContent = active.length > 1 ? '通知をすべて止める' : '通知を止める';
     $('stop-alarm').disabled = !connected || alarmSaving;

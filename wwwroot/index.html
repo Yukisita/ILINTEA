@@ -9,13 +9,11 @@
 </head>
 <body>
   <header class="navbar">
-    <span class="nav-caption">配信サポート</span>
     <a class="brand" href="/">▣ StreamPrompter</a>
-    <span class="nav-caption nav-right">プロトタイプ</span>
   </header>
   <main>
     <div class="mode-bar">
-      <div class="mode-group"><strong>配信ルーム</strong><nav class="mode-tabs" aria-label="画面切り替え"><a href="/" id="edit-tab">編集</a><a href="/view/" id="view-tab">閲覧</a></nav></div>
+      <nav class="mode-tabs" aria-label="画面切り替え"><a href="/" id="edit-tab">編集</a><a href="/view/" id="view-tab">閲覧</a></nav>
       <div class="mode-actions"><span id="connection" class="connection" role="status">接続中…</span><button id="copy-link" class="editor-only">↗ 閲覧URLをコピー</button></div>
     </div>
     <div id="notice" class="notice" role="alert" hidden></div>
@@ -24,7 +22,7 @@
       <span class="muted">16:9 <span class="canvas-size">／ 1280 × 720</span></span>
     </div>
     <div class="toolbar viewer-only">
-      <span id="viewer-alarm-status" class="muted">出演者用</span><div class="button-group"><button id="flip-x" aria-pressed="false">↔ 左右反転</button><button id="flip-y" aria-pressed="false">↕ 上下反転</button><button id="fullscreen">⛶ 全画面</button></div>
+      <span id="viewer-alarm-status" class="muted"></span><div class="button-group"><button id="flip-x" aria-pressed="false">↔ 左右反転</button><button id="flip-y" aria-pressed="false">↕ 上下反転</button><button id="fullscreen">⛶ 全画面</button></div>
     </div>
     <div class="workspace">
       <section class="elements-panel editor-only" aria-label="配置中の要素">
@@ -93,6 +91,5 @@
     </div>
     <p class="viewer-help viewer-only">反転はこの端末だけに適用されます。全画面では操作バーが隠れます。</p>
   </main>
-  <footer class="editor-only">StreamPrompter <span>試作版 · 内容はサーバー再起動で初期状態に戻ります</span></footer>
 </body>
 </html>
