@@ -5,7 +5,7 @@ namespace StreamPrompter;
 
 public record Element(Guid Id, string Kind, double X, double Y, double Width, double Height,
     string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
-    ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null)
+    ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null, bool ShowCountdown = false)
 {
     public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}" : null;
 }
@@ -36,7 +36,7 @@ public record CanvasPatch(string? AspectRatio)
 public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, CanvasSettings Canvas);
 public record CreateElement(string Kind, string? Text = null);
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
-    int? FontSize, string? Color, string? Align, bool? Visible)
+    int? FontSize, string? Color, string? Align, bool? Visible, bool? ShowCountdown = null)
 {
     public bool IsValid() =>
         new[] { X, Y, Width, Height }.All(value => value is null || double.IsFinite(value.Value)) &&
@@ -148,6 +148,7 @@ public sealed class BoardStore
                 Color = patch.Color ?? current.Color,
                 Align = patch.Align ?? current.Align,
                 Visible = patch.Visible ?? current.Visible,
+                ShowCountdown = patch.ShowCountdown ?? current.ShowCountdown,
                 Playback = playback,
                 DisplaySchedule = patch.Visible is not null ? null : current.DisplaySchedule
             };

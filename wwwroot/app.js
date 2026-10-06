@@ -120,7 +120,6 @@ function createElementNode(element, editable) {
     const node = document.createElement('div');
     node.className = `element element-${element.kind}`;
     node.dataset.id = element.id;
-    if (element.kind === 'alarm' && !editable) node.setAttribute('role', 'alert');
     const content = document.createElement('div');
     content.className = 'element-content';
     if (element.kind === 'script') {
@@ -164,8 +163,7 @@ function renderElement(node, element, editable, limits) {
     node.style.textAlign = element.align;
     node.classList.toggle('selected', editable && element.id === selectedId);
     if (element.kind === 'text') node.firstElementChild.textContent = element.text;
-    if (element.kind === 'alarm' && node.firstElementChild.textContent !== element.text)
-        node.firstElementChild.textContent = element.text;
+    if (element.kind === 'alarm') renderAlarmElement(node, element, editable);
     if (element.kind === 'script') {
         const script = node.firstElementChild.firstElementChild;
         if (script.textContent !== element.text) script.textContent = element.text;
@@ -267,7 +265,24 @@ function displayIsWaiting(element) {
 }
 
 function elementIsVisible(element) {
-    return element.visible && !displayIsWaiting(element);
+    return element.visible && (!displayIsWaiting(element) || (element.kind === 'alarm' && element.showCountdown));
+}
+
+function remainingTime(element) {
+    const seconds = Math.max(0, Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000));
+    const pad = value => String(value).padStart(2, '0');
+    return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
+}
+
+function renderAlarmElement(node, element, editable) {
+    const counting = displayIsWaiting(element) && element.showCountdown;
+    const content = node.firstElementChild;
+    const label = counting ? 'アラームまで' : 'アラーム';
+    if (content.dataset.alarmLabel !== label) content.dataset.alarmLabel = label;
+    const message = counting ? remainingTime(element) : element.text;
+    if (content.textContent !== message) content.textContent = message;
+    node.classList.toggle('counting-down', counting);
+    if (!editable) node.setAttribute('role', counting ? 'timer' : 'alert');
 }
 
 function updateScheduledVisibility() {
@@ -276,6 +291,12 @@ function updateScheduledVisibility() {
         const element = effectiveElement(original);
         const node = nodes.get(element.id);
         if (!node) continue;
+        if (element.kind === 'alarm') {
+            const wasCounting = node.classList.contains('counting-down');
+            renderAlarmElement(node, element, !viewer);
+            if (wasCounting !== node.classList.contains('counting-down')) changed = true;
+            if (!viewer && programNodes.has(element.id)) renderAlarmElement(programNodes.get(element.id), original, false);
+        }
         const offAir = !elementIsVisible(element);
         if (!viewer) {
             if (node.classList.contains('off-air') !== offAir) changed = true;
@@ -297,13 +318,15 @@ function renderDisplayControls() {
     const element = selectedElement();
     if (viewer || !element) return;
     const waiting = displayIsWaiting(element);
-    const visible = elementIsVisible(element);
+    const visible = element.visible && !waiting;
     const alarm = element.kind === 'alarm';
     const busy = displayBusy || scriptBusy || !connected || pending.has(element.id) || inFlight.has(element.id);
     $('display-schedule-fields').hidden = alarm;
     $('alarm-settings').hidden = !alarm;
     $('alarm-at').disabled = busy || visible;
     $('schedule-alarm').disabled = busy || visible;
+    $('alarm-countdown').disabled = busy;
+    if (document.activeElement !== $('alarm-countdown')) $('alarm-countdown').value = String(!!element.showCountdown);
     $('schedule-alarm').textContent = waiting ? '通知予約を変更' : '通知を予約';
     if (alarm) {
         const alarmKey = `${element.id}/${element.displaySchedule?.id ?? ''}`;
@@ -315,7 +338,7 @@ function renderDisplayControls() {
     }
     for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || visible;
     $('show-element').disabled = busy || visible;
-    $('hide-element').disabled = busy || !visible;
+    $('hide-element').disabled = busy || !elementIsVisible(element);
     $('cancel-display').disabled = busy;
     $('delete-element').disabled = busy;
     $('confirm-delete').disabled = busy;
@@ -324,11 +347,11 @@ function renderDisplayControls() {
     $('cancel-display').hidden = !waiting;
     $('show-element').textContent = waiting ? '予約を解除して表示' : 'Programに表示';
     $('schedule-display').textContent = waiting ? '予約を変更' : '表示を予約';
-    const status = `Program：${waiting ? '予約中' : visible ? '表示中' : '非表示'}`;
+    const status = `Program：${waiting ? alarm && element.showCountdown ? '残時間を表示中' : '予約中' : visible ? '表示中' : '非表示'}`;
     if ($('display-state').textContent !== status) $('display-state').textContent = status;
     $('display-state').className = `display-state ${waiting ? 'waiting' : visible ? 'visible' : ''}`;
     $('display-status').textContent = alarm
-        ? waiting ? `通知予約：${alarmFormatter.format(new Date(element.displaySchedule.at))}。解除後も非表示です。`
+        ? waiting ? `残り ${remainingTime(element)}（${alarmFormatter.format(new Date(element.displaySchedule.at))}）。解除後も非表示です。`
             : visible ? '通知中。再予約する場合は先に非表示にしてください。' : '指定時刻にProgramへ表示します。音は鳴りません。'
         : waiting
         ? `あと${Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000)}秒で表示。解除後も非表示です。`
@@ -366,7 +389,7 @@ async function scheduleDisplay(cancel = false) {
 
 async function scheduleAlarm() {
     const element = selectedElement();
-    if (element?.kind !== 'alarm' || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id) || elementIsVisible(element)) return;
+    if (element?.kind !== 'alarm' || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id) || (element.visible && !displayIsWaiting(element))) return;
     const date = new Date($('alarm-at').value);
     if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
         notify('通知日時は未来の日時を指定してください。');
@@ -529,7 +552,7 @@ function localDateTimeValue(date) {
 
 function renderAlarm() {
     const alarms = state.elements.filter((element) => element.kind === 'alarm');
-    const active = alarms.filter(elementIsVisible);
+    const active = alarms.filter(element => elementIsVisible(element) && !displayIsWaiting(element));
     const waiting = alarms.filter(displayIsWaiting);
     $('viewer-alarm-status').textContent = active.length ? `アラーム ${active.length}件・通知中`
         : waiting.length ? `アラーム ${waiting.length}件・予約中` : '';
@@ -540,7 +563,7 @@ function renderAlarm() {
 
 async function clearAlarm() {
     if (!connected || alarmSaving) return;
-    const alarms = state.elements.filter((element) => element.kind === 'alarm' && elementIsVisible(element));
+    const alarms = state.elements.filter((element) => element.kind === 'alarm' && elementIsVisible(element) && !displayIsWaiting(element));
     if (!alarms.length) return;
     alarmSaving = true;
     renderAlarm();
@@ -656,6 +679,10 @@ if (!viewer) {
     $('script-speed').addEventListener('input', () => { $('script-speed-value').textContent = `${$('script-speed').value} px/秒`; });
     $('script-speed').addEventListener('change', () => controlScript('speed', Number($('script-speed').value)));
     $('alarm-at').addEventListener('input', () => { alarmFormDirty = true; });
+    $('alarm-countdown').addEventListener('change', () => {
+        const element = selectedElement();
+        if (element?.kind === 'alarm') queuePatch(element.id, { showCountdown: $('alarm-countdown').value === 'true' });
+    });
     $('schedule-alarm').addEventListener('click', scheduleAlarm);
     $('add-clock').addEventListener('click', () => addElement('clock'));
     $('add-text').addEventListener('click', () => addElement('text'));

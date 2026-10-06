@@ -81,6 +81,8 @@
             <div id="alarm-settings" class="display-schedule" hidden>
               <label for="alarm-at">通知日時 <span class="muted">音なし</span></label>
               <input id="alarm-at" type="datetime-local" step="1" required>
+              <label class="countdown-label" for="alarm-countdown">残時間の表示</label>
+              <select id="alarm-countdown"><option value="false">通知時刻になったら表示</option><option value="true">予約中も残時間を表示</option></select>
               <button id="schedule-alarm" type="button">通知を予約</button>
             </div>
             <div class="schedule-status"><p id="display-status" class="muted"></p><button id="cancel-display" type="button" hidden>予約を解除</button></div>

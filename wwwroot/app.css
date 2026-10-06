@@ -72,9 +72,11 @@ button.primary:hover:not(:disabled) { background: #0b5ed7; }
 #delete-confirmation span { flex: 1; text-align: left; font-size: 11px; }
 .element-clock { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .element-alarm { padding: 12px 18px; border: 4px solid #ffc107; border-radius: 8px; background: #fff3cd; box-shadow: 0 4px 16px #0006; }
-.element-alarm .element-content::before { content: "アラーム"; display: block; font-size: .6em; font-weight: 700; margin-bottom: 6px; }
+.element-alarm .element-content::before { content: attr(data-alarm-label); display: block; font-size: .6em; font-weight: 700; margin-bottom: 6px; }
+.element-alarm.counting-down .element-content { font-variant-numeric: tabular-nums; }
 #alarm-settings label { display: flex; align-items: center; justify-content: space-between; }
 #alarm-at { margin-top: 6px; }
+#alarm-settings .countdown-label { margin: 8px 0 4px; }
 #schedule-alarm { margin-top: 8px; font-size: 13px; }
 .element img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 body:not(.viewer) #stage .element { cursor: move; touch-action: none; user-select: none; }
