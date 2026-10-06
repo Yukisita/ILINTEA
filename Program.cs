@@ -22,7 +22,7 @@ app.UseStaticFiles();
 app.MapGet("/api/board", (BoardStore board) => board.Snapshot());
 app.MapPatch("/api/canvas", (CanvasPatch patch, BoardStore board) =>
     patch.IsValid() ? Results.Ok(board.UpdateCanvas(patch))
-        : Results.BadRequest(new { error = "画面比率は選択肢から指定してください。" }));
+        : Results.BadRequest(new { error = "画面比率は選択肢から、背景色は#に続く6桁の色コードで指定してください。" }));
 app.MapGet("/api/viewer-url", (HttpRequest request) =>
 {
     var url = ViewerLink.Create(request);

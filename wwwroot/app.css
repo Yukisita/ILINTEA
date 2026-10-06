@@ -26,6 +26,7 @@ main { padding: 20px 24px; max-width: 1800px; margin: auto; }
 .canvas-settings { display: flex; align-items: center; gap: 8px; }
 .canvas-settings label { white-space: nowrap; }
 .canvas-settings select { width: auto; min-width: 100px; font-size: 13px; }
+.canvas-settings input[type="color"] { width: 48px; height: 31px; }
 .muted { color: #6c757d; font-size: 13px; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "canvas properties" "elements properties"; gap: 20px; align-items: start; }
 .canvas-column { grid-area: canvas; min-width: 0; }

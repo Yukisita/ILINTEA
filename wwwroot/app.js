@@ -517,6 +517,8 @@ function fitStage(hostId, viewportId, stageId, output = false) {
     $(viewportId).style.height = `${height * scale}px`;
     $(stageId).style.width = `${width}px`;
     $(stageId).style.height = `${height}px`;
+    $(stageId).style.backgroundColor = state.canvas?.backgroundColor ?? '#000000';
+    $(viewportId).style.backgroundColor = state.canvas?.backgroundColor ?? '#000000';
     $(stageId).style.transform = `scale(${scale})`;
     $(viewportId).style.transform = viewer ? `scale(${flipX ? -1 : 1}, ${flipY ? -1 : 1})` : '';
     if (!output) stageScale = scale;
@@ -603,7 +605,9 @@ async function refreshBoard() { acceptState(await request('/api/board')); }
 
 function renderCanvasControls() {
     $('aspect-ratio').value = state.canvas?.aspectRatio ?? '16:9';
-    $('aspect-ratio').disabled = !connected || canvasSaving || sending || pending.size > 0 || !!gesture;
+    $('background-color').value = state.canvas?.backgroundColor ?? '#000000';
+    for (const id of ['aspect-ratio', 'background-color'])
+        $(id).disabled = !connected || canvasSaving || sending || pending.size > 0 || !!gesture;
 }
 
 async function updateCanvas(patch) {
@@ -648,6 +652,7 @@ events.onerror = () => {
 
 if (!viewer) {
     $('aspect-ratio').addEventListener('change', () => updateCanvas({ aspectRatio: $('aspect-ratio').value }));
+    $('background-color').addEventListener('change', () => updateCanvas({ backgroundColor: $('background-color').value }));
     $('show-element').addEventListener('click', () => setElementVisibility(true));
     $('hide-element').addEventListener('click', () => setElementVisibility(false));
     $('schedule-display').addEventListener('click', () => scheduleDisplay());

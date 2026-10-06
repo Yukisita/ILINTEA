@@ -24,14 +24,15 @@ public record DisplaySchedule(Guid Id, DateTimeOffset At);
 public record ScheduleDisplay(int DelaySeconds);
 
 public record ScheduleAlarm(DateTimeOffset At);
-public record CanvasSettings(string AspectRatio = "16:9")
+public record CanvasSettings(string AspectRatio = "16:9", string BackgroundColor = "#000000")
 {
     public double Width => AspectRatio switch { "9:16" => 720, "3:4" => 960, _ => 1280 };
     public double Height => AspectRatio switch { "16:9" => 720, "4:3" => 960, _ => 1280 };
 }
-public record CanvasPatch(string? AspectRatio)
+public record CanvasPatch(string? AspectRatio, string? BackgroundColor)
 {
-    public bool IsValid() => AspectRatio is null or "16:9" or "4:3" or "1:1" or "3:4" or "9:16";
+    public bool IsValid() => (AspectRatio is null or "16:9" or "4:3" or "1:1" or "3:4" or "9:16") &&
+        (BackgroundColor is null || Regex.IsMatch(BackgroundColor, @"\A#[0-9a-fA-F]{6}\z"));
 }
 public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, CanvasSettings Canvas);
 public record CreateElement(string Kind, string? Text = null);
@@ -255,12 +256,17 @@ public sealed class BoardStore
     {
         lock (gate)
         {
-            var updated = canvas with { AspectRatio = patch.AspectRatio ?? canvas.AspectRatio };
+            var updated = canvas with
+            {
+                AspectRatio = patch.AspectRatio ?? canvas.AspectRatio,
+                BackgroundColor = patch.BackgroundColor ?? canvas.BackgroundColor
+            };
             if (updated == canvas) return canvas;
             var scaleX = updated.Width / canvas.Width;
             var scaleY = updated.Height / canvas.Height;
             canvas = updated;
-            for (var i = 0; i < elements.Count; i++) elements[i] = ScaleElement(elements[i], scaleX, scaleY);
+            if (scaleX != 1 || scaleY != 1)
+                for (var i = 0; i < elements.Count; i++) elements[i] = ScaleElement(elements[i], scaleX, scaleY);
             Publish();
             return canvas;
         }
