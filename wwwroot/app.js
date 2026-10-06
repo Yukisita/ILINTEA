@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const viewer = location.pathname.startsWith('/view');
 document.body.classList.toggle('viewer', viewer);
+if (viewer) document.querySelector('.preview-monitor').setAttribute('aria-label', '閲覧画面');
 $(viewer ? 'view-tab' : 'edit-tab').classList.add('active');
 $(viewer ? 'view-tab' : 'edit-tab').setAttribute('aria-current', 'page');
 document.title = `${viewer ? '閲覧' : '編集'} - StreamPrompter`;
@@ -23,7 +24,9 @@ let deleteConfirmId = null;
 const pending = new Map();
 const inFlight = new Map();
 const nodes = new Map();
+const programNodes = new Map();
 const scriptLimits = new Map();
+const programScriptLimits = new Map();
 const kinds = { text: 'テキスト', clock: '時計', image: '画像', script: 'TXT原稿' };
 const fields = { text: 'text', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height' };
 let flipX = false;
@@ -100,75 +103,100 @@ async function flushPending() {
 }
 
 function select(id) {
-    if (id !== selectedId) deleteConfirmId = null;
+    if (id !== selectedId) {
+        deleteConfirmId = null;
+    }
     if (id !== selectedId && $('property-fields').contains(document.activeElement)) document.activeElement.blur();
     selectedId = id;
     render();
 }
 
+function createElementNode(element, editable) {
+    const node = document.createElement('div');
+    node.className = `element element-${element.kind}`;
+    node.dataset.id = element.id;
+    const content = document.createElement('div');
+    content.className = 'element-content';
+    if (element.kind === 'script') {
+        const script = document.createElement('div');
+        script.className = 'script-text';
+        content.append(script);
+    }
+    if (element.kind === 'image') {
+        const image = document.createElement('img');
+        image.src = element.imageUrl;
+        image.alt = '配置した画像';
+        content.append(image);
+    }
+    node.append(content);
+    if (editable) {
+        const handle = document.createElement('button');
+        handle.className = 'resize-handle';
+        handle.title = 'ドラッグでサイズ変更';
+        handle.setAttribute('aria-label', 'サイズ変更（数値でも設定できます）');
+        node.append(handle);
+        node.addEventListener('pointerdown', startGesture);
+        node.addEventListener('pointermove', moveGesture);
+        node.addEventListener('pointerup', endGesture);
+        node.addEventListener('pointercancel', endGesture);
+        node.addEventListener('lostpointercapture', endGesture);
+    }
+    return node;
+}
+
+function renderElement(node, element, editable, limits) {
+    const visible = elementIsVisible(element);
+    node.hidden = !editable && !visible;
+    node.classList.toggle('off-air', editable && !visible);
+    node.dataset.previewState = displayIsWaiting(element) ? '予約中' : '非表示';
+    node.style.left = `${element.x}px`;
+    node.style.top = `${element.y}px`;
+    node.style.width = `${element.width}px`;
+    node.style.height = `${element.height}px`;
+    node.style.fontSize = `${element.fontSize}px`;
+    node.style.color = element.color;
+    node.style.textAlign = element.align;
+    node.classList.toggle('selected', editable && element.id === selectedId);
+    if (element.kind === 'text') node.firstElementChild.textContent = element.text;
+    if (element.kind === 'script') {
+        const script = node.firstElementChild.firstElementChild;
+        if (script.textContent !== element.text) script.textContent = element.text;
+        if (!node.hidden) limits.set(element.id, Math.max(0, script.scrollHeight - element.height));
+    }
+    if (editable) node.lastElementChild.hidden = element.id !== selectedId;
+}
+
 function render() {
     const liveIds = new Set(state.elements.map((element) => element.id));
     if (selectedId && !liveIds.has(selectedId)) selectedId = null;
-    for (const [id, node] of nodes) {
-        if (!liveIds.has(id)) {
-            node.remove();
-            nodes.delete(id);
-            scriptLimits.delete(id);
-            pending.delete(id);
+    for (const collection of [nodes, programNodes]) {
+        for (const [id, node] of collection) {
+            if (!liveIds.has(id)) {
+                node.remove();
+                collection.delete(id);
+                scriptLimits.delete(id);
+                programScriptLimits.delete(id);
+                pending.delete(id);
+            }
         }
     }
     for (const original of state.elements) {
         const element = effectiveElement(original);
-        let node = nodes.get(element.id);
-        if (!node) {
-            node = document.createElement('div');
-            node.className = `element element-${element.kind}`;
-            node.dataset.id = element.id;
-            const content = document.createElement('div');
-            content.className = 'element-content';
-            if (element.kind === 'script') {
-                const script = document.createElement('div');
-                script.className = 'script-text';
-                content.append(script);
-            }
-            if (element.kind === 'image') {
-                const image = document.createElement('img');
-                image.src = element.imageUrl;
-                image.alt = '配置した画像';
-                content.append(image);
-            }
-            node.append(content);
-            if (!viewer) {
-                const handle = document.createElement('button');
-                handle.className = 'resize-handle';
-                handle.title = 'ドラッグでサイズ変更';
-                handle.setAttribute('aria-label', 'サイズ変更（数値でも設定できます）');
-                node.append(handle);
-                node.addEventListener('pointerdown', startGesture);
-                node.addEventListener('pointermove', moveGesture);
-                node.addEventListener('pointerup', endGesture);
-                node.addEventListener('pointercancel', endGesture);
-                node.addEventListener('lostpointercapture', endGesture);
-            }
+        if (!nodes.has(element.id)) {
+            const node = createElementNode(element, !viewer);
             nodes.set(element.id, node);
             $('stage').append(node);
         }
-        node.hidden = !elementIsVisible(element);
-        node.style.left = `${element.x}px`;
-        node.style.top = `${element.y}px`;
-        node.style.width = `${element.width}px`;
-        node.style.height = `${element.height}px`;
-        node.style.fontSize = `${element.fontSize}px`;
-        node.style.color = element.color;
-        node.style.textAlign = element.align;
-        node.classList.toggle('selected', element.id === selectedId);
-        if (element.kind === 'text') node.firstElementChild.textContent = element.text;
-        if (element.kind === 'script') {
-            const script = node.firstElementChild.firstElementChild;
-            if (script.textContent !== element.text) script.textContent = element.text;
-            if (!node.hidden) scriptLimits.set(element.id, Math.max(0, script.scrollHeight - element.height));
+        renderElement(nodes.get(element.id), element, !viewer, scriptLimits);
+        if (!viewer) {
+            if (!programNodes.has(original.id)) {
+                const node = createElementNode(original, false);
+                programNodes.set(original.id, node);
+                $('program-stage').append(node);
+            }
+            // Program uses the shared state, just like the viewer, rather than unsent edits.
+            renderElement(programNodes.get(original.id), original, false, programScriptLimits);
         }
-        if (!viewer) node.lastElementChild.hidden = element.id !== selectedId;
     }
     updateClocks();
     if (!viewer) {
@@ -212,9 +240,8 @@ function renderProperties() {
     $('type-fields').hidden = element.kind === 'image';
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);
-        if (document.activeElement === input && input.type !== 'checkbox') continue;
-        if (input.type === 'checkbox') input.checked = elementIsVisible(element);
-        else input.value = element[property];
+        if (document.activeElement === input) continue;
+        input.value = element[property];
     }
     renderScriptControls();
     renderDisplayControls();
@@ -234,11 +261,18 @@ function updateScheduledVisibility() {
         const element = effectiveElement(original);
         const node = nodes.get(element.id);
         if (!node) continue;
-        const hidden = !elementIsVisible(element);
-        if (node.hidden === hidden) continue;
-        node.hidden = hidden;
+        const offAir = !elementIsVisible(element);
+        if (!viewer) {
+            if (node.classList.contains('off-air') !== offAir) changed = true;
+            node.classList.toggle('off-air', offAir);
+            node.dataset.previewState = displayIsWaiting(element) ? '予約中' : '非表示';
+        }
+        const output = viewer ? node : programNodes.get(element.id);
+        const hidden = !elementIsVisible(viewer ? element : original);
+        if (!output || output.hidden === hidden) continue;
+        output.hidden = hidden;
         if (!hidden && element.kind === 'script')
-            scriptLimits.set(element.id, Math.max(0, node.firstElementChild.firstElementChild.scrollHeight - element.height));
+            (viewer ? scriptLimits : programScriptLimits).set(element.id, Math.max(0, output.firstElementChild.firstElementChild.scrollHeight - (viewer ? element.height : original.height)));
         changed = true;
     }
     if (changed && !viewer) { renderList(); renderProperties(); }
@@ -259,9 +293,9 @@ function renderDisplayControls() {
     $('delete-element').hidden = deleteConfirmId === element.id;
     $('delete-confirmation').hidden = deleteConfirmId !== element.id;
     $('cancel-display').hidden = !waiting;
-    $('show-element').textContent = waiting ? '予約を解除して表示' : '表示する';
+    $('show-element').textContent = waiting ? '予約を解除して表示' : 'Programに表示';
     $('schedule-display').textContent = waiting ? '予約を変更' : '表示を予約';
-    const status = `表示状態：${waiting ? '予約中' : visible ? '表示中' : '非表示'}`;
+    const status = `Program：${waiting ? '予約中' : visible ? '表示中' : '非表示'}`;
     if ($('display-state').textContent !== status) $('display-state').textContent = status;
     $('display-state').className = `display-state ${waiting ? 'waiting' : visible ? 'visible' : ''}`;
     $('display-status').textContent = waiting
@@ -332,6 +366,11 @@ function animateScripts() {
         if (element.kind !== 'script' || !nodes.has(element.id)) continue;
         const offset = Math.min(scriptLimits.get(element.id) ?? 0, scriptPosition(element));
         nodes.get(element.id).firstElementChild.firstElementChild.style.transform = `translateY(-${offset.toFixed(2)}px)`;
+        const output = programNodes.get(element.id);
+        if (output) {
+            const programOffset = Math.min(programScriptLimits.get(element.id) ?? 0, scriptPosition(element));
+            output.firstElementChild.firstElementChild.style.transform = `translateY(-${programOffset.toFixed(2)}px)`;
+        }
     }
     requestAnimationFrame(animateScripts);
 }
@@ -391,17 +430,23 @@ function endGesture(event) {
     void flushPending();
 }
 
-function resizeStage() {
-    const host = $('stage-host');
+function fitStage(hostId, viewportId, stageId, output = false) {
+    const host = $(hostId);
     const style = getComputedStyle(host);
     const availableWidth = host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     const availableHeight = host.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
     const fitHeight = viewer || document.fullscreenElement || style.getPropertyValue('--fit-stage-height').trim() === '1';
-    stageScale = Math.max(.01, Math.min(availableWidth / 1280, fitHeight ? availableHeight / 720 : Infinity));
-    $('stage-viewport').style.width = `${1280 * stageScale}px`;
-    $('stage-viewport').style.height = `${720 * stageScale}px`;
-    $('stage').style.transform = `scale(${stageScale})`;
-    $('stage-viewport').style.transform = viewer ? `scale(${flipX ? -1 : 1}, ${flipY ? -1 : 1})` : '';
+    const scale = Math.max(.01, Math.min(availableWidth / 1280, fitHeight ? availableHeight / 720 : Infinity));
+    $(viewportId).style.width = `${1280 * scale}px`;
+    $(viewportId).style.height = `${720 * scale}px`;
+    $(stageId).style.transform = `scale(${scale})`;
+    $(viewportId).style.transform = viewer ? `scale(${flipX ? -1 : 1}, ${flipY ? -1 : 1})` : '';
+    if (!output) stageScale = scale;
+}
+
+function resizeStage() {
+    fitStage('stage-host', 'stage-viewport', 'stage');
+    if (!viewer) fitStage('program-host', 'program-viewport', 'program-stage', true);
 }
 
 const clockFormatter = new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
@@ -411,7 +456,10 @@ const alarmFormatter = new Intl.DateTimeFormat('ja-JP', {
 function updateClocks() {
     const time = clockFormatter.format(new Date(Date.now() + serverOffset));
     for (const element of state.elements) {
-        if (element.kind === 'clock') nodes.get(element.id).firstElementChild.textContent = time;
+        if (element.kind === 'clock') {
+            nodes.get(element.id).firstElementChild.textContent = time;
+            if (!viewer) programNodes.get(element.id).firstElementChild.textContent = time;
+        }
     }
     renderAlarm();
     updateScheduledVisibility();
@@ -438,6 +486,11 @@ function renderAlarm() {
     if ($('alarm-alert-message').textContent !== alertText) $('alarm-alert-message').textContent = alertText;
     $('alarm-alert').hidden = !active;
     $('stage').classList.toggle('alarm-active', active);
+    if (!viewer) {
+        $('program-alarm-alert-message').textContent = alertText;
+        $('program-alarm-alert').hidden = !active;
+        $('program-stage').classList.toggle('alarm-active', active);
+    }
     $('stop-alarm').hidden = !active;
     $('stop-alarm').disabled = !connected || alarmSaving;
     $('alarm-fields').disabled = !connected || alarmSaving;
@@ -663,6 +716,7 @@ $('fullscreen').addEventListener('click', async () => {
 $('exit-fullscreen').addEventListener('click', () => document.exitFullscreen());
 document.addEventListener('fullscreenchange', resizeStage);
 new ResizeObserver(resizeStage).observe($('stage-host'));
+if (!viewer) new ResizeObserver(resizeStage).observe($('program-host'));
 setInterval(updateClocks, 250);
 requestAnimationFrame(animateScripts);
 updateMirror();
