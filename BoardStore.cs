@@ -99,13 +99,13 @@ public sealed class BoardStore
         lock (gate)
         {
             if (elements.Count >= 20) return null;
-            var element = kind switch
+            var element = (kind switch
             {
                 "clock" => new Element(Guid.NewGuid(), kind, 880, 24, 368, 88, Align: "right"),
                 "image" => new Element(Guid.NewGuid(), kind, 80, 440, 240, 180),
                 "script" => new Element(Guid.NewGuid(), kind, 80, 140, 1120, 420, text ?? "", 48, Playback: new()),
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "ここにテキストを入力", 56)
-            };
+            }) with { Visible = false };
             elements.Add(element);
             if (image is not null) images.Add(element.Id, image);
             Publish();

@@ -41,11 +41,25 @@ main { padding: 20px 24px; max-width: 1800px; margin: auto; }
 .script-controls button { padding: 6px 9px; font-size: 13px; }
 #script-speed { margin: 8px 0; accent-color: #0d6efd; }
 #script-speed-value { float: right; }
-.delay-inputs { display: grid; grid-template-columns: minmax(0, 1fr) 85px; gap: 10px; }
-.delay-inputs input, .delay-inputs select { margin-top: 6px; }
-.schedule-controls { gap: 6px; flex-wrap: wrap; margin-top: 12px; }
-.schedule-controls button { padding: 6px 9px; font-size: 13px; }
-#display-status { line-height: 1.6; }
+.display-panel { margin-top: 16px; padding: 12px; border: 1px solid #d6e3f3; border-radius: 6px; background: #f7faff; }
+.display-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.properties .display-heading h3 { border: 0; padding: 0; margin: 0; font-weight: 600; }
+.display-state { padding: 2px 8px; border-radius: 4px; background: #e9ecef; color: #495057; font-size: 12px; white-space: nowrap; }
+.display-state.visible { background: #d1e7dd; color: #146c43; }
+.display-state.waiting { background: #fff3cd; color: #856404; }
+.visibility-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.visibility-actions button { padding: 7px 8px; font-size: 13px; }
+button.primary { background: #0d6efd; color: #fff; }
+button.primary:hover:not(:disabled) { background: #0b5ed7; }
+.display-schedule { border-top: 1px solid #d6e3f3; margin-top: 12px; padding-top: 10px; }
+.delay-inputs { display: grid; grid-template-columns: minmax(0, 1fr) 80px; gap: 8px; margin-top: 6px; }
+.delay-inputs button { grid-column: 1 / -1; }
+.schedule-status { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+#display-status { flex: 1; min-width: 0; margin: 0; font-size: 12px; line-height: 1.5; }
+.schedule-status button { flex: none; padding: 5px 8px; font-size: 12px; }
+.delete-actions { border-top: 1px solid #e9ecef; margin-top: 14px; padding-top: 12px; text-align: right; }
+#delete-confirmation { display: flex; justify-content: end; align-items: center; gap: 6px; flex-wrap: wrap; }
+#delete-confirmation span { flex: 1; text-align: left; font-size: 11px; }
 .element-clock { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .element img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 body:not(.viewer) .element { cursor: move; touch-action: none; user-select: none; }
@@ -66,9 +80,7 @@ input[type="color"] { height: 35px; padding: 3px; }
 h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid #e9ecef; padding-top: 18px; font-weight: 500; }
 .position-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .position-grid input { margin-top: 5px; }
-.checkbox-label { display: flex; align-items: center; gap: 8px; margin: 18px 0; }
-.checkbox-label input { accent-color: #0d6efd; }
-.danger { border-color: #dc3545; color: #dc3545; font-size: 13px; width: 100%; }
+.danger { border-color: #dc3545; color: #dc3545; font-size: 13px; }
 .danger:hover { background: #fff1f2; }
 .empty-state { font-size: 13px; line-height: 1.8; color: #6c757d; padding: 22px 16px; margin: 0; }
 .panel-heading { display: flex; justify-content: space-between; padding: 13px 16px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
@@ -138,11 +150,12 @@ footer { border-top: 1px solid #dee2e6; padding: 16px 24px; font-size: 12px; col
   .properties input[type="color"] { height: 31px; padding: 3px; }
   .properties h3 { margin: 10px 0 8px; padding-top: 8px; font-weight: 600; }
   .position-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-  .checkbox-label { margin: 10px 0; }
-  .delay-inputs { grid-template-columns: minmax(0, 1fr) 100px; gap: 8px; }
-  .delay-inputs input, .delay-inputs select { margin-top: 5px; }
-  .schedule-controls { margin-top: 8px; }
-  #display-status { font-size: 12px; line-height: 1.5; margin: 8px 0 12px; }
+  .display-panel { margin-top: 12px; padding: 10px; }
+  .display-schedule { margin-top: 10px; padding-top: 8px; }
+  .delay-inputs { grid-template-columns: minmax(0, 1fr) 70px auto; }
+  .delay-inputs button { grid-column: auto; }
+  body:not(.viewer) .schedule-status button { padding: 5px 8px; font-size: 12px; }
+  .delete-actions { margin-top: 10px; padding-top: 10px; }
   .alarm-panel { flex: none; margin: 0; }
   .alarm-panel .panel-heading { padding: 9px 12px; }
   #alarm-form { padding: 10px 12px; }

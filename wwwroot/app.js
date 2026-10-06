@@ -19,12 +19,13 @@ let alarmFormDirty = false;
 let shownAlarmId = null;
 let scriptBusy = false;
 let displayBusy = false;
+let deleteConfirmId = null;
 const pending = new Map();
 const inFlight = new Map();
 const nodes = new Map();
 const scriptLimits = new Map();
 const kinds = { text: 'テキスト', clock: '時計', image: '画像', script: 'TXT原稿' };
-const fields = { text: 'text', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height', visible: 'visible' };
+const fields = { text: 'text', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height' };
 let flipX = false;
 let flipY = false;
 try {
@@ -67,6 +68,7 @@ function selectedElement() {
 
 function queuePatch(id, patch) {
     if (!connected || !state.elements.some((element) => element.id === id)) return;
+    if (deleteConfirmId === id) deleteConfirmId = null;
     pending.set(id, { ...pending.get(id), ...patch });
     $('save-status').textContent = '反映中…';
     render();
@@ -98,6 +100,7 @@ async function flushPending() {
 }
 
 function select(id) {
+    if (id !== selectedId) deleteConfirmId = null;
     if (id !== selectedId && $('property-fields').contains(document.activeElement)) document.activeElement.blur();
     selectedId = id;
     render();
@@ -245,19 +248,38 @@ function renderDisplayControls() {
     const element = selectedElement();
     if (viewer || !element) return;
     const waiting = displayIsWaiting(element);
-    const busy = displayBusy || !connected || pending.has(element.id) || inFlight.has(element.id);
-    for (const id of ['display-delay', 'display-unit', 'schedule-display', 'cancel-display']) $(id).disabled = busy;
+    const visible = elementIsVisible(element);
+    const busy = displayBusy || scriptBusy || !connected || pending.has(element.id) || inFlight.has(element.id);
+    for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || visible;
+    $('show-element').disabled = busy || visible;
+    $('hide-element').disabled = busy || !visible;
+    $('cancel-display').disabled = busy;
+    $('delete-element').disabled = busy;
+    $('confirm-delete').disabled = busy;
+    $('delete-element').hidden = deleteConfirmId === element.id;
+    $('delete-confirmation').hidden = deleteConfirmId !== element.id;
     $('cancel-display').hidden = !waiting;
-    $('schedule-display').textContent = waiting ? '予約を置き換える' : '表示を予約';
-    $('visible').checked = elementIsVisible(element);
+    $('show-element').textContent = waiting ? '予約を解除して表示' : '表示する';
+    $('schedule-display').textContent = waiting ? '予約を変更' : '表示を予約';
+    const status = `表示状態：${waiting ? '予約中' : visible ? '表示中' : '非表示'}`;
+    if ($('display-state').textContent !== status) $('display-state').textContent = status;
+    $('display-state').className = `display-state ${waiting ? 'waiting' : visible ? 'visible' : ''}`;
     $('display-status').textContent = waiting
-        ? `あと${Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000)}秒で表示。解除すると非表示のままになります。`
-        : element.displaySchedule ? '予約時刻になったため表示しました。' : '予約すると、指定した時間まで非表示になります。';
+        ? `あと${Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000)}秒で表示。解除後も非表示です。`
+        : visible ? '予約する場合は、先に非表示にしてください。' : '予約時刻までは非表示のままです。';
+}
+
+function setElementVisibility(visible) {
+    const element = selectedElement();
+    if (!element || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id)) return;
+    queuePatch(element.id, { visible });
+    void flushPending();
 }
 
 async function scheduleDisplay(cancel = false) {
     const element = selectedElement();
-    if (!element || !connected || displayBusy) return;
+    if (!element || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id)) return;
+    if (!cancel && elementIsVisible(element)) return;
     const seconds = Number($('display-delay').value) * Number($('display-unit').value);
     if (!cancel && (!Number.isInteger(seconds) || seconds < 1 || seconds > 86400 || !$('display-delay').checkValidity())) {
         notify('表示までの時間は1秒～24時間で指定してください。');
@@ -491,6 +513,8 @@ events.onerror = () => {
 };
 
 if (!viewer) {
+    $('show-element').addEventListener('click', () => setElementVisibility(true));
+    $('hide-element').addEventListener('click', () => setElementVisibility(false));
     $('schedule-display').addEventListener('click', () => scheduleDisplay());
     $('cancel-display').addEventListener('click', () => scheduleDisplay(true));
     $('display-unit').addEventListener('change', () => { $('display-delay').max = 86400 / Number($('display-unit').value); });
@@ -566,7 +590,7 @@ if (!viewer) {
         const input = $(id);
         const update = (event) => {
             if (!selectedId || event.isComposing) return;
-            let value = input.type === 'checkbox' ? input.checked : input.value;
+            let value = input.value;
             if (input.type === 'number') {
                 if (input.value === '' || !input.checkValidity()) { input.reportValidity(); return; }
                 value = Number(value);
@@ -577,14 +601,28 @@ if (!viewer) {
         if (input.tagName === 'TEXTAREA') input.addEventListener('compositionend', update);
         input.addEventListener('blur', () => setTimeout(renderProperties, 0));
     }
-    $('delete-element').addEventListener('click', async () => {
-        if (!selectedId) return;
-        const id = selectedId;
+    $('delete-element').addEventListener('click', () => {
+        deleteConfirmId = selectedId;
+        renderDisplayControls();
+        $('cancel-delete').focus();
+    });
+    $('cancel-delete').addEventListener('click', () => {
+        deleteConfirmId = null;
+        renderDisplayControls();
+        $('delete-element').focus();
+    });
+    $('confirm-delete').addEventListener('click', async () => {
+        const element = selectedElement();
+        if (!element || element.id !== deleteConfirmId || !connected || displayBusy || pending.has(element.id) || inFlight.has(element.id)) return;
+        const id = element.id;
+        displayBusy = true;
+        renderDisplayControls();
         pending.delete(id);
         try {
             await request(`/api/elements/${id}`, { method: 'DELETE' });
             await refreshBoard();
         } catch (error) { notify(error.message); }
+        finally { displayBusy = false; deleteConfirmId = null; renderDisplayControls(); }
     });
     $('stage').addEventListener('pointerdown', (event) => {
         if (event.target === $('stage')) select(null);

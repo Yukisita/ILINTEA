@@ -57,7 +57,7 @@
       </section>
       <aside class="properties editor-only" aria-label="要素の設定">
         <h2 id="property-title">要素の設定</h2>
-        <p id="selection-empty" class="empty-state">画面上の要素を選ぶと、<br>内容や位置を変更できます。</p>
+        <p id="selection-empty" class="empty-state">要素一覧から選ぶと、<br>内容・位置・表示を変更できます。</p>
         <fieldset id="property-fields" hidden>
           <div id="text-fields"><label for="text">テキスト内容</label><textarea id="text" rows="5" maxlength="4000"></textarea></div>
           <div id="script-fields" hidden>
@@ -76,12 +76,16 @@
             <label>X<input id="x" type="number" min="0" max="1200"></label><label>Y<input id="y" type="number" min="0" max="672"></label>
             <label>幅<input id="width" type="number" min="80" max="1280"></label><label>高さ<input id="height" type="number" min="48" max="720"></label>
           </div>
-          <label class="checkbox-label"><input id="visible" type="checkbox">画面に表示する</label>
-          <h3>表示予約</h3>
-          <div class="delay-inputs"><label>表示まで<input id="display-delay" type="number" min="1" max="86400" step="1" value="10"></label><label>単位<select id="display-unit"><option value="1">秒後</option><option value="60">分後</option></select></label></div>
-          <div class="button-group schedule-controls"><button id="schedule-display" type="button">表示を予約</button><button id="cancel-display" type="button" hidden>予約を解除</button></div>
-          <p id="display-status" class="muted"></p>
-          <button id="delete-element" class="danger">要素を削除</button>
+          <section class="display-panel" aria-labelledby="display-heading">
+            <div class="display-heading"><h3 id="display-heading">表示の操作</h3><span id="display-state" class="display-state" role="status"></span></div>
+            <div class="visibility-actions"><button id="show-element" class="primary" type="button">表示する</button><button id="hide-element" type="button">非表示にする</button></div>
+            <div id="display-schedule-fields" class="display-schedule">
+              <label for="display-delay">指定時間後に表示</label>
+              <div class="delay-inputs"><input id="display-delay" aria-label="表示まで" type="number" min="1" max="86400" step="1" value="10"><select id="display-unit" aria-label="単位"><option value="1">秒後</option><option value="60">分後</option></select><button id="schedule-display" type="button">表示を予約</button></div>
+            </div>
+            <div class="schedule-status"><p id="display-status" class="muted"></p><button id="cancel-display" type="button" hidden>予約を解除</button></div>
+          </section>
+          <div class="delete-actions"><button id="delete-element" class="danger" type="button">要素を削除…</button><div id="delete-confirmation" hidden><span>この要素を削除しますか？</span><button id="confirm-delete" class="danger" type="button">削除する</button><button id="cancel-delete" type="button">キャンセル</button></div></div>
         </fieldset>
       </aside>
     </div>
