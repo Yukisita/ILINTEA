@@ -92,6 +92,22 @@ function selectedElement() {
     return element ? effectiveElement(element) : null;
 }
 
+function elementActionBusy(id) {
+    return !connected || canvasSaving || scriptBusy || gesture?.id === id || editSync.hasChanges(id);
+}
+
+function displayActionBusy(id) {
+    return displayBusy || elementActionBusy(id);
+}
+
+function canvasActionBusy() {
+    return !connected || canvasSaving || editSync.sending || editSync.hasPending || !!gesture;
+}
+
+function orderActionBusy() {
+    return !connected || orderBusy || !!gesture || canvasSaving;
+}
+
 function queuePatch(id, patch) {
     if (!connected || canvasSaving || scriptLoadingId === id || !state.elements.some((element) => element.id === id)) return;
     if (deleteConfirmId === id) deleteConfirmId = null;
@@ -242,7 +258,7 @@ function renderList() {
             move.textContent = symbol;
             move.title = t(key);
             move.setAttribute('aria-label', t(key));
-            move.disabled = !connected || orderBusy || !!gesture || canvasSaving
+            move.disabled = orderActionBusy()
                 || (offset < 0 ? index === 0 : index === state.elements.length - 1);
             move.addEventListener('click', () => moveElement(element.id, offset));
             order.append(move);
@@ -254,7 +270,7 @@ function renderList() {
 }
 
 async function moveElement(id, offset) {
-    if (!connected || orderBusy || gesture || canvasSaving) return;
+    if (orderActionBusy()) return;
     orderBusy = true;
     renderList();
     try {
@@ -356,7 +372,7 @@ function renderDisplayControls() {
     const visible = element.visible && !waiting;
     const onProgram = elementIsVisible(element);
     const alarm = element.kind === 'alarm';
-    const busy = displayBusy || scriptBusy || !connected || gesture?.id === element.id || editSync.hasChanges(element.id);
+    const busy = displayActionBusy(element.id);
     $('display-schedule-fields').hidden = alarm;
     $('alarm-settings').hidden = !alarm;
     $('alarm-at').disabled = busy || visible;
@@ -398,14 +414,14 @@ function renderDisplayControls() {
 
 function toggleElementVisibility() {
     const element = selectedElement();
-    if (!element || !connected || displayBusy || scriptBusy || editSync.hasChanges(element.id)) return;
+    if (!element || displayActionBusy(element.id)) return;
     queuePatch(element.id, { visible: !elementIsVisible(element) });
     void editSync.flush();
 }
 
 async function scheduleDisplay(cancel = false) {
     const element = selectedElement();
-    if (!element || !connected || displayBusy || scriptBusy || editSync.hasChanges(element.id)) return;
+    if (!element || displayActionBusy(element.id)) return;
     if (!cancel && elementIsVisible(element)) return;
     const seconds = Number($('display-delay').value) * Number($('display-unit').value);
     if (!cancel && (!Number.isInteger(seconds) || seconds < 1 || seconds > 86400 || !$('display-delay').checkValidity())) {
@@ -427,7 +443,7 @@ async function scheduleDisplay(cancel = false) {
 
 async function scheduleAlarm() {
     const element = selectedElement();
-    if (element?.kind !== 'alarm' || !connected || displayBusy || scriptBusy || editSync.hasChanges(element.id) || (element.visible && !displayIsWaiting(element))) return;
+    if (element?.kind !== 'alarm' || displayActionBusy(element.id) || (element.visible && !displayIsWaiting(element))) return;
     const date = new Date($('alarm-at').value);
     if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
         notify(t('errors.alarmFuture'));
@@ -457,7 +473,7 @@ function renderScriptControls() {
     const limit = scriptLimits.get(element.id) ?? 0;
     const waiting = displayIsWaiting(element);
     const ended = !waiting && scriptPosition(element) >= limit;
-    const busy = !connected || scriptBusy || gesture?.id === element.id || editSync.hasChanges(element.id);
+    const busy = elementActionBusy(element.id);
     const running = !!element.playback.startedAt;
     $('replace-script').disabled = busy;
     $('script-play').disabled = busy || running || ended;
@@ -491,7 +507,7 @@ function animateScripts() {
 
 async function controlScript(action, speed) {
     const element = selectedElement();
-    if (!connected || scriptBusy || element?.kind !== 'script') return;
+    if (element?.kind !== 'script' || elementActionBusy(element.id)) return;
     scriptBusy = true;
     renderScriptControls();
     try {
@@ -652,11 +668,11 @@ function renderCanvasControls() {
     $('aspect-ratio').value = state.canvas?.aspectRatio ?? '16:9';
     $('background-color').value = state.canvas?.backgroundColor ?? '#000000';
     for (const id of ['aspect-ratio', 'background-color'])
-        $(id).disabled = !connected || canvasSaving || editSync.sending || editSync.hasPending || !!gesture;
+        $(id).disabled = canvasActionBusy();
 }
 
 async function updateCanvas(patch) {
-    if (!connected || canvasSaving || editSync.sending || editSync.hasPending || gesture) return;
+    if (canvasActionBusy()) return;
     canvasSaving = true;
     render();
     try {
@@ -723,7 +739,7 @@ async function uploadImage(file, id = null) {
 }
 
 async function loadScriptFile(file, id = null) {
-    if (!file || !connected || scriptBusy || (id && editSync.hasChanges(id))) return;
+    if (!file || !connected || scriptBusy || (id && elementActionBusy(id))) return;
     scriptBusy = true;
     scriptLoadingId = id;
     $('add-script').disabled = true;
@@ -766,7 +782,7 @@ if (!viewer) {
     let scriptReplaceId = null;
     $('replace-script').addEventListener('click', () => {
         const element = selectedElement();
-        if (element?.kind !== 'script' || !connected || scriptBusy || editSync.hasChanges(element.id)) return;
+        if (element?.kind !== 'script' || elementActionBusy(element.id)) return;
         scriptReplaceId = element.id;
         $('replacement-script-file').click();
     });
@@ -838,7 +854,7 @@ if (!viewer) {
     });
     $('confirm-delete').addEventListener('click', async () => {
         const element = selectedElement();
-        if (!element || element.id !== deleteConfirmId || !connected || displayBusy || editSync.hasChanges(element.id)) return;
+        if (!element || element.id !== deleteConfirmId || displayActionBusy(element.id)) return;
         const id = element.id;
         displayBusy = true;
         renderDisplayControls();
