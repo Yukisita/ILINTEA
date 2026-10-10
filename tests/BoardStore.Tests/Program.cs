@@ -171,6 +171,7 @@ Run("Alarms reject past and current times and remain cancelable after starting",
     Assert(!board.Snapshot().Elements.Single().Visible, "Canceled alarm is still visible");
 });
 
+passed += await BoardArchiveTests.RunAsync();
 Console.WriteLine($"{passed} tests passed.");
 
 void Run(string name, Action test)

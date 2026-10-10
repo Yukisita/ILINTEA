@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
   <link rel="stylesheet" href="/app.css?v=20261010-layer-order">
-  <script type="module" src="/app.js?v=20261010-refactor-controls"></script>
+  <script type="module" src="/app.js?v=20261010-settings-file"></script>
 </head>
 <body>
   <header class="navbar">
@@ -23,6 +23,7 @@
     <div class="toolbar editor-only">
       <div class="button-group"><button id="add-clock" disabled data-i18n="add.clock"></button><button id="add-text" disabled data-i18n="add.text"></button><button id="add-alarm" disabled data-i18n="add.alarm"></button><button id="add-image" disabled data-i18n="add.image"></button><button id="add-script" disabled data-i18n="add.script"></button><input id="image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden><input id="script-file" type="file" accept=".txt,text/plain" hidden></div>
       <div class="canvas-settings"><label for="aspect-ratio" data-i18n="canvas.ratio"></label><select id="aspect-ratio" disabled><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="3:4" data-i18n="canvas.ratioPortrait34"></option><option value="9:16" data-i18n="canvas.ratioPortrait916"></option></select><label for="background-color" data-i18n="canvas.background"></label><input id="background-color" type="color" value="#000000" disabled></div>
+      <div class="button-group" data-i18n-title="settings.scope"><button id="download-settings" type="button" disabled data-i18n="settings.download"></button><button id="upload-settings" type="button" disabled data-i18n="settings.upload"></button><input id="settings-file" type="file" accept=".zip,application/zip" hidden></div>
     </div>
     <div class="toolbar viewer-only">
       <span id="viewer-alarm-status" class="muted"></span><div class="button-group"><button id="flip-x" aria-pressed="false" data-i18n="viewer.flipX"></button><button id="flip-y" aria-pressed="false" data-i18n="viewer.flipY"></button><button id="fullscreen" data-i18n="viewer.fullscreen"></button></div>

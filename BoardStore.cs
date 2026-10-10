@@ -5,6 +5,7 @@ namespace StreamPrompter;
 // One in-memory board: property patches are serialized so editing text does not overwrite another user's placement.
 public sealed class BoardStore(TimeProvider? timeProvider = null)
 {
+    public const int MaxElements = 20;
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private readonly object gate = new();
     private readonly List<Element> elements = [];
@@ -16,6 +17,37 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
     public BoardSnapshot Snapshot()
     {
         lock (gate) return SnapshotCore();
+    }
+
+    internal BoardBackupState CaptureBackup()
+    {
+        lock (gate)
+        {
+            var now = clock.GetUtcNow();
+            return new(canvas, elements.Select(element => element with
+            {
+                Visible = element.Visible && (element.DisplaySchedule is null || element.DisplaySchedule.At <= now),
+                DisplaySchedule = null
+            }).ToArray(), new(images));
+        }
+    }
+
+    internal BoardSnapshot RestoreBackup(BoardBackupState backup)
+    {
+        // Fresh IDs isolate restored elements from stale edits and cached images in other clients.
+        var restored = backup.Elements.Select(element => (Original: element, Id: Guid.NewGuid())).ToArray();
+        var restoredImages = restored.Where(item => item.Original.Kind == "image")
+            .ToDictionary(item => item.Id, item => backup.Images[item.Original.Id]);
+        lock (gate)
+        {
+            canvas = backup.Canvas;
+            elements.Clear();
+            elements.AddRange(restored.Select(item => item.Original with { Id = item.Id }));
+            images.Clear();
+            foreach (var image in restoredImages) images.Add(image.Key, image.Value);
+            Publish();
+            return SnapshotCore();
+        }
     }
 
     public (Guid Id, ChannelReader<BoardSnapshot> Reader) Subscribe()
@@ -45,7 +77,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
     {
         lock (gate)
         {
-            if (elements.Count >= 20) return null;
+            if (elements.Count >= MaxElements) return null;
             var element = (kind switch
             {
                 "clock" => new Element(Guid.NewGuid(), kind, 880, 24, 368, 88, Align: "right"),

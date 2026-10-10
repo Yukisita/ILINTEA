@@ -28,6 +28,39 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapGet("/api/board", (BoardStore board) => board.Snapshot());
+app.MapGet("/api/settings/download", async (BoardStore board, CancellationToken cancellationToken) =>
+{
+    var file = CreateTemporaryFile();
+    try
+    {
+        await BoardArchive.WriteAsync(file, board, cancellationToken);
+        file.Position = 0;
+        return Results.File(file, "application/zip", "StreamPrompter-settings.zip");
+    }
+    catch
+    {
+        await file.DisposeAsync();
+        throw;
+    }
+});
+app.MapPost("/api/settings/upload", async (HttpContext context, BoardStore board) =>
+{
+    if (context.Request.ContentLength is 0 or > BoardArchive.MaxArchiveBytes)
+        return Results.BadRequest(I18n.Error("errors.settingsFileSize"));
+    if (context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } bodyLimit)
+        bodyLimit.MaxRequestBodySize = BoardArchive.MaxArchiveBytes;
+    await using var file = CreateTemporaryFile();
+    try
+    {
+        await context.Request.Body.CopyToAsync(file, context.RequestAborted);
+        file.Position = 0;
+        return Results.Ok(await BoardArchive.RestoreAsync(file, board, context.RequestAborted));
+    }
+    catch (BoardArchiveException exception)
+    {
+        return Results.BadRequest(I18n.Error(exception.ErrorKey));
+    }
+});
 app.MapPatch("/api/canvas", (CanvasPatch patch, BoardStore board) =>
     patch.IsValid() ? Results.Ok(board.UpdateCanvas(patch))
         : Results.BadRequest(I18n.Error("errors.canvas")));
@@ -146,6 +179,11 @@ catch (Exception exception) when (starting && GetPortError(exception) is { } err
         Console.ReadLine();
     }
 }
+
+static FileStream CreateTemporaryFile() => new(
+    Path.Combine(Path.GetTempPath(), $"StreamPrompter-{Guid.NewGuid():N}.tmp"),
+    FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 81920,
+    FileOptions.Asynchronous | FileOptions.DeleteOnClose);
 
 static async Task<IResult> SaveImage(Guid? id, IFormFile file, BoardStore board, CancellationToken cancellationToken)
 {

@@ -28,6 +28,8 @@ let displayBusy = false;
 let deleteConfirmId = null;
 let canvasSaving = false;
 let orderBusy = false;
+let addBusy = false;
+let settingsBusy = false;
 const canvasWidth = () => state.canvas?.width ?? 1280;
 const canvasHeight = () => state.canvas?.height ?? 720;
 const editSync = createEditSync({
@@ -64,6 +66,11 @@ function notify(message) {
 }
 
 async function request(path, options = {}) {
+    const response = await requestResponse(path, options);
+    return response.status === 204 ? null : response.json();
+}
+
+async function requestResponse(path, options = {}) {
     const response = await fetch(path, options);
     if (!response.ok) {
         let message = t('errors.request');
@@ -73,7 +80,7 @@ async function request(path, options = {}) {
         } catch { /* Non-JSON server error. */ }
         throw new Error(message);
     }
-    return response.status === 204 ? null : response.json();
+    return response;
 }
 
 function effectiveElement(element) {
@@ -93,7 +100,7 @@ function selectedElement() {
 }
 
 function elementActionBusy(id) {
-    return !connected || canvasSaving || scriptBusy || gesture?.id === id || editSync.hasChanges(id);
+    return !connected || settingsBusy || canvasSaving || scriptBusy || gesture?.id === id || editSync.hasChanges(id);
 }
 
 function displayActionBusy(id) {
@@ -101,15 +108,15 @@ function displayActionBusy(id) {
 }
 
 function canvasActionBusy() {
-    return !connected || canvasSaving || editSync.sending || editSync.hasPending || !!gesture;
+    return !connected || settingsBusy || canvasSaving || editSync.sending || editSync.hasPending || !!gesture;
 }
 
 function orderActionBusy() {
-    return !connected || orderBusy || !!gesture || canvasSaving;
+    return !connected || settingsBusy || orderBusy || !!gesture || canvasSaving;
 }
 
 function queuePatch(id, patch) {
-    if (!connected || canvasSaving || scriptLoadingId === id || !state.elements.some((element) => element.id === id)) return;
+    if (!connected || settingsBusy || canvasSaving || scriptLoadingId === id || !state.elements.some((element) => element.id === id)) return;
     if (deleteConfirmId === id) deleteConfirmId = null;
     editSync.queue(id, patch);
 }
@@ -191,6 +198,7 @@ function renderElement(node, element, editable, limits, layer) {
 
 function render() {
     resizeStage();
+    if (!viewer) renderSettingsControls();
     if (!viewer) renderCanvasControls();
     const liveIds = new Set(state.elements.map((element) => element.id));
     if (selectedId && !liveIds.has(selectedId)) selectedId = null;
@@ -285,7 +293,7 @@ async function moveElement(id, offset) {
 function renderProperties() {
     const element = selectedElement();
     $('property-fields').hidden = !element;
-    $('property-fields').disabled = !connected || canvasSaving || element?.id === scriptLoadingId;
+    $('property-fields').disabled = !connected || settingsBusy || canvasSaving || element?.id === scriptLoadingId;
     $('selection-empty').hidden = !!element;
     $('property-title').textContent = element ? t('properties.kindTitle', { kind: t(kinds[element.kind]) }) : t('properties.title');
     if (!element) return;
@@ -300,7 +308,7 @@ function renderProperties() {
     $('script-fields').hidden = element.kind !== 'script';
     $('script-file-fields').hidden = element.kind !== 'script';
     $('image-fields').hidden = element.kind !== 'image';
-    $('replace-image').disabled = !connected || imageBusy;
+    $('replace-image').disabled = !connected || settingsBusy || imageBusy;
     $('type-fields').hidden = element.kind === 'image';
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);
@@ -520,7 +528,7 @@ async function controlScript(action, speed) {
 }
 
 function startGesture(event) {
-    if (!connected || canvasSaving || event.button !== 0 || gesture) return;
+    if (!connected || settingsBusy || canvasSaving || event.button !== 0 || gesture) return;
     const node = event.currentTarget;
     const element = state.elements.find((item) => item.id === node.dataset.id);
     if (!element) return;
@@ -606,6 +614,7 @@ function updateClocks() {
     updateScheduledVisibility();
     renderScriptControls();
     renderDisplayControls();
+    if (!viewer) renderSettingsControls();
 }
 
 function localDateTimeValue(date) {
@@ -645,6 +654,9 @@ async function clearAlarm() {
 }
 
 async function addElement(kind) {
+    if (!connected || settingsBusy || addBusy) return;
+    addBusy = true;
+    renderSettingsControls();
     try {
         const element = await request('/api/elements', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, ...(kind === 'alarm' ? { text: t('alarm.defaultMessage') } : {}) })
@@ -653,6 +665,7 @@ async function addElement(kind) {
         await refreshBoard();
         select(element.id);
     } catch (error) { notify(error.message); }
+    finally { addBusy = false; renderSettingsControls(); }
 }
 
 function acceptState(snapshot) {
@@ -663,6 +676,55 @@ function acceptState(snapshot) {
 }
 
 async function refreshBoard() { acceptState(await request('/api/board')); }
+
+function settingsActionBusy() {
+    return canvasActionBusy() || addBusy || displayBusy || scriptBusy || imageBusy || alarmSaving || orderBusy;
+}
+
+function renderSettingsControls() {
+    const busy = settingsActionBusy();
+    $('download-settings').disabled = busy;
+    $('upload-settings').disabled = busy;
+    for (const id of ['add-clock', 'add-text', 'add-alarm']) $(id).disabled = !connected || settingsBusy || addBusy;
+    $('add-image').disabled = !connected || settingsBusy || imageBusy;
+    $('add-script').disabled = !connected || settingsBusy || scriptBusy;
+}
+
+async function downloadSettings() {
+    if (settingsActionBusy()) return;
+    settingsBusy = true;
+    render();
+    try {
+        const response = await requestResponse('/api/settings/download');
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'StreamPrompter-settings.zip';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) { notify(error.message); }
+    finally { settingsBusy = false; render(); }
+}
+
+async function uploadSettings(file) {
+    if (!file || settingsActionBusy()) return;
+    if (!window.confirm(t('settings.restoreConfirm', { file: file.name }))) return;
+    if (settingsActionBusy()) return;
+    settingsBusy = true;
+    render();
+    try {
+        const snapshot = await request('/api/settings/upload', {
+            method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file
+        });
+        selectedId = null;
+        deleteConfirmId = null;
+        alarmFormDirty = false;
+        shownAlarmId = null;
+        acceptState(snapshot);
+        notify(t('settings.restored'));
+    } catch (error) { notify(error.message); }
+    finally { settingsBusy = false; render(); }
+}
 
 function renderCanvasControls() {
     $('aspect-ratio').value = state.canvas?.aspectRatio ?? '16:9';
@@ -689,11 +751,9 @@ function setConnection(value) {
     connected = value;
     $('connection').textContent = value ? t('connection.connected') : t('connection.reconnecting');
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
-    for (const id of ['add-clock', 'add-text', 'add-image', 'add-script', 'add-alarm']) $(id).disabled = !value;
-    $('add-image').disabled = !value || imageBusy;
-    $('add-script').disabled = !value || scriptBusy;
-    $('replace-image').disabled = !value || imageBusy;
-    $('property-fields').disabled = !value || canvasSaving || (scriptLoadingId !== null && selectedId === scriptLoadingId);
+    $('replace-image').disabled = !value || settingsBusy || imageBusy;
+    $('property-fields').disabled = !value || settingsBusy || canvasSaving || (scriptLoadingId !== null && selectedId === scriptLoadingId);
+    if (!viewer) renderSettingsControls();
     if (!viewer) renderCanvasControls();
     if (!viewer && changed) renderList();
     renderAlarm();
@@ -717,7 +777,7 @@ events.onerror = () => {
 };
 
 async function uploadImage(file, id = null) {
-    if (!file || !connected || imageBusy) return;
+    if (!file || !connected || settingsBusy || imageBusy) return;
     imageBusy = true;
     $('add-image').disabled = true;
     renderProperties();
@@ -733,13 +793,13 @@ async function uploadImage(file, id = null) {
     } catch (error) { notify(error.message); }
     finally {
         imageBusy = false;
-        $('add-image').disabled = !connected;
+        $('add-image').disabled = !connected || settingsBusy;
         renderProperties();
     }
 }
 
 async function loadScriptFile(file, id = null) {
-    if (!file || !connected || scriptBusy || (id && elementActionBusy(id))) return;
+    if (!file || !connected || settingsBusy || scriptBusy || (id && elementActionBusy(id))) return;
     scriptBusy = true;
     scriptLoadingId = id;
     $('add-script').disabled = true;
@@ -761,12 +821,21 @@ async function loadScriptFile(file, id = null) {
     finally {
         scriptBusy = false;
         scriptLoadingId = null;
-        $('add-script').disabled = !connected;
+        $('add-script').disabled = !connected || settingsBusy;
         renderProperties();
     }
 }
 
 if (!viewer) {
+    $('download-settings').addEventListener('click', downloadSettings);
+    $('upload-settings').addEventListener('click', () => {
+        if (!settingsActionBusy()) $('settings-file').click();
+    });
+    $('settings-file').addEventListener('change', async (event) => {
+        const input = event.currentTarget;
+        await uploadSettings(input.files[0]);
+        input.value = '';
+    });
     $('aspect-ratio').addEventListener('change', () => updateCanvas({ aspectRatio: $('aspect-ratio').value }));
     $('background-color').addEventListener('change', () => updateCanvas({ backgroundColor: $('background-color').value }));
     $('toggle-visibility').addEventListener('click', toggleElementVisibility);
@@ -816,7 +885,7 @@ if (!viewer) {
     let imageReplaceId = null;
     $('replace-image').addEventListener('click', () => {
         const element = selectedElement();
-        if (element?.kind !== 'image' || !connected || imageBusy) return;
+        if (element?.kind !== 'image' || !connected || settingsBusy || imageBusy) return;
         imageReplaceId = element.id;
         $('replacement-image-file').click();
     });
@@ -881,7 +950,7 @@ if (!viewer) {
         finally { $('copy-link').disabled = false; }
     });
     window.addEventListener('beforeunload', (event) => {
-        if (editSync.hasPending || editSync.sending) { event.preventDefault(); event.returnValue = ''; }
+        if (editSync.hasPending || editSync.sending || settingsBusy) { event.preventDefault(); event.returnValue = ''; }
     });
 }
 
