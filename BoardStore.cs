@@ -3,8 +3,9 @@ using System.Threading.Channels;
 namespace StreamPrompter;
 
 // One in-memory board: property patches are serialized so editing text does not overwrite another user's placement.
-public sealed class BoardStore
+public sealed class BoardStore(TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private readonly object gate = new();
     private readonly List<Element> elements = [];
     private readonly Dictionary<Guid, ImageData> images = [];
@@ -68,7 +69,7 @@ public sealed class BoardStore
             var index = elements.FindIndex(element => element.Id == id);
             if (index < 0) return null;
             var current = elements[index];
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.GetUtcNow();
             var playback = current.Playback;
             if (patch.Visible is not null && current.DisplaySchedule?.At > now && playback?.StartedAt is not null)
                 playback = playback with { Offset = playback.PositionAt(now), StartedAt = patch.Visible.Value ? now : null };
@@ -151,7 +152,7 @@ public sealed class BoardStore
             if (index < 0) return null;
             var element = elements[index];
             var playback = element.Playback!;
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.GetUtcNow();
             var position = playback.PositionAt(now);
             var start = element.DisplaySchedule?.At > now ? element.DisplaySchedule.At : now;
             playback = control.Action switch
@@ -175,7 +176,7 @@ public sealed class BoardStore
             var index = elements.FindIndex(element => element.Id == id);
             if (index < 0) return null;
             var element = elements[index];
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.GetUtcNow();
             var schedule = new DisplaySchedule(Guid.NewGuid(), now.AddSeconds(delaySeconds));
             var playback = element.Playback;
             if (playback?.StartedAt is not null)
@@ -193,7 +194,7 @@ public sealed class BoardStore
             var index = elements.FindIndex(element => element.Id == id);
             if (index < 0) return false;
             var element = elements[index];
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.GetUtcNow();
             if (element.DisplaySchedule?.Id != scheduleId ||
                 (element.Kind != "alarm" && element.DisplaySchedule.At <= now)) return false;
             var playback = element.Playback;
@@ -209,7 +210,7 @@ public sealed class BoardStore
         lock (gate)
         {
             var index = elements.FindIndex(element => element.Id == id && element.Kind == "alarm");
-            if (index < 0 || request.At <= DateTimeOffset.UtcNow) return null;
+            if (index < 0 || request.At <= clock.GetUtcNow()) return null;
             elements[index] = elements[index] with
             {
                 Visible = true,
@@ -260,7 +261,7 @@ public sealed class BoardStore
         };
     }
 
-    private BoardSnapshot SnapshotCore() => new(revision, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), elements.ToArray(), canvas);
+    private BoardSnapshot SnapshotCore() => new(revision, clock.GetUtcNow().ToUnixTimeMilliseconds(), elements.ToArray(), canvas);
 
     private void Publish()
     {

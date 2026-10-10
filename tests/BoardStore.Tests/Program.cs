@@ -80,6 +80,97 @@ Run("Image detection accepts supported signatures and rejects incomplete or unkn
     Equal<string?>(null, ImageData.DetectContentType([]));
 });
 
+Run("Snapshots and subscription events use the supplied clock", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var subscription = board.Subscribe();
+    Assert(subscription.Reader.TryRead(out var initial), "Missing initial snapshot");
+    Equal(clock.Now.ToUnixTimeMilliseconds(), initial!.ServerTime);
+    clock.Now += TimeSpan.FromSeconds(10);
+    board.Add("text");
+    Assert(subscription.Reader.TryRead(out var updated), "Missing update event");
+    Equal(clock.Now.ToUnixTimeMilliseconds(), updated!.ServerTime);
+    Equal(updated.ServerTime, board.Snapshot().ServerTime);
+    Equal(initial.Revision + 1, updated.Revision);
+    board.Unsubscribe(subscription.Id);
+});
+
+Run("Playback retains its position across speed changes, pause and resume", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("script", text: "script")!.Id;
+    board.ControlScript(id, new("play", null));
+    clock.Now += TimeSpan.FromSeconds(3);
+    var playback = board.ControlScript(id, new("speed", 60))!.Playback!;
+    Equal(90, playback.PositionAt(clock.Now));
+    clock.Now += TimeSpan.FromSeconds(2);
+    playback = board.ControlScript(id, new("pause", null))!.Playback!;
+    Equal(210, playback.Offset);
+    Equal<DateTimeOffset?>(null, playback.StartedAt);
+    clock.Now += TimeSpan.FromSeconds(5);
+    playback = board.ControlScript(id, new("play", null))!.Playback!;
+    clock.Now += TimeSpan.FromSeconds(2);
+    Equal(330, playback.PositionAt(clock.Now));
+    playback = board.ControlScript(id, new("reset", null))!.Playback!;
+    Equal(0, playback.Offset);
+    Equal<DateTimeOffset?>(null, playback.StartedAt);
+});
+
+Run("Scheduled playback waits until its start and cannot be canceled at or after that time", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("script", text: "script")!.Id;
+    board.ControlScript(id, new("play", null));
+    clock.Now += TimeSpan.FromSeconds(2);
+    var scheduled = board.ScheduleDisplay(id, 10)!;
+    var schedule = scheduled.DisplaySchedule!;
+    Equal(clock.Now.AddSeconds(10), schedule.At);
+    Equal<DateTimeOffset?>(schedule.At, scheduled.Playback!.StartedAt);
+    clock.Now += TimeSpan.FromSeconds(9);
+    var playback = board.ControlScript(id, new("speed", 50))!.Playback!;
+    Equal(60, playback.PositionAt(clock.Now));
+    clock.Now += TimeSpan.FromSeconds(1);
+    Equal(60, playback.PositionAt(clock.Now));
+    Assert(!board.CancelDisplay(id, schedule.Id), "Display canceled at its start time");
+    clock.Now += TimeSpan.FromSeconds(1);
+    Equal(110, playback.PositionAt(clock.Now));
+    Assert(!board.CancelDisplay(id, schedule.Id), "Display canceled after its start time");
+});
+
+Run("Canceling a future display hides it and pauses playback at its current position", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("script", text: "script")!.Id;
+    board.ControlScript(id, new("play", null));
+    clock.Now += TimeSpan.FromSeconds(2);
+    var schedule = board.ScheduleDisplay(id, 10)!.DisplaySchedule!;
+    Assert(!board.CancelDisplay(id, Guid.NewGuid()), "Wrong schedule ID was accepted");
+    Assert(board.CancelDisplay(id, schedule.Id), "Future display was not canceled");
+    var element = board.Snapshot().Elements.Single();
+    Assert(!element.Visible && element.DisplaySchedule is null, "Canceled display is still scheduled or visible");
+    Equal(60, element.Playback!.Offset);
+    Equal<DateTimeOffset?>(null, element.Playback.StartedAt);
+});
+
+Run("Alarms reject past and current times and remain cancelable after starting", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("alarm")!.Id;
+    Equal<Element?>(null, board.ScheduleAlarm(id, new(clock.Now.AddSeconds(-1))));
+    Equal<Element?>(null, board.ScheduleAlarm(id, new(clock.Now)));
+    var scheduled = board.ScheduleAlarm(id, new(clock.Now.AddSeconds(10).ToOffset(TimeSpan.FromHours(9))))!;
+    Equal(clock.Now.AddSeconds(10), scheduled.DisplaySchedule!.At);
+    Equal(TimeSpan.Zero, scheduled.DisplaySchedule.At.Offset);
+    clock.Now += TimeSpan.FromSeconds(10);
+    Assert(board.CancelDisplay(id, scheduled.DisplaySchedule.Id), "Started alarm was not canceled");
+    Assert(!board.Snapshot().Elements.Single().Visible, "Canceled alarm is still visible");
+});
+
 Console.WriteLine($"{passed} tests passed.");
 
 void Run(string name, Action test)
@@ -98,4 +189,10 @@ static void Equal<T>(T expected, T actual) =>
 static void Assert(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
+}
+
+sealed class ManualTimeProvider : TimeProvider
+{
+    public DateTimeOffset Now { get; set; } = DateTimeOffset.UnixEpoch;
+    public override DateTimeOffset GetUtcNow() => Now;
 }

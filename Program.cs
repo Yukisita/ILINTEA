@@ -17,6 +17,7 @@ builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
 // Report expected port conflicts below; retain normal host diagnostics once running.
 builder.Logging.AddFilter("Microsoft.Extensions.Hosting.Internal.Host", level => !starting || level >= LogLevel.Critical);
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<BoardStore>();
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = UploadLimits.MaxFileBytes);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = UploadLimits.MaxRequestBodyBytes);
@@ -85,9 +86,9 @@ app.MapPatch("/api/elements/{id:guid}", (Guid id, ElementPatch patch, BoardStore
     return element is null ? Results.NotFound(I18n.Error("errors.elementMissing")) : Results.Ok(element);
 });
 
-app.MapPut("/api/elements/{id:guid}/alarm", (Guid id, ScheduleAlarm request, BoardStore board) =>
+app.MapPut("/api/elements/{id:guid}/alarm", (Guid id, ScheduleAlarm request, BoardStore board, TimeProvider timeProvider) =>
 {
-    if (request.At <= DateTimeOffset.UtcNow)
+    if (request.At <= timeProvider.GetUtcNow())
         return Results.BadRequest(I18n.Error("errors.alarmFuture"));
     var element = board.ScheduleAlarm(id, request);
     return element is null ? Results.NotFound(I18n.Error("errors.alarmMissing")) : Results.Ok(element);
