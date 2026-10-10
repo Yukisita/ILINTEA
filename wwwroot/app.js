@@ -343,7 +343,7 @@ function renderDisplayControls() {
     const visible = element.visible && !waiting;
     const onProgram = elementIsVisible(element);
     const alarm = element.kind === 'alarm';
-    const busy = displayBusy || scriptBusy || !connected || pending.has(element.id) || inFlight.has(element.id);
+    const busy = displayBusy || scriptBusy || !connected || gesture?.id === element.id || pending.has(element.id) || inFlight.has(element.id);
     $('display-schedule-fields').hidden = alarm;
     $('alarm-settings').hidden = !alarm;
     $('alarm-at').disabled = busy || visible;
@@ -444,7 +444,7 @@ function renderScriptControls() {
     const limit = scriptLimits.get(element.id) ?? 0;
     const waiting = displayIsWaiting(element);
     const ended = !waiting && scriptPosition(element) >= limit;
-    const busy = !connected || scriptBusy || pending.has(element.id) || inFlight.has(element.id);
+    const busy = !connected || scriptBusy || gesture?.id === element.id || pending.has(element.id) || inFlight.has(element.id);
     const running = !!element.playback.startedAt;
     $('replace-script').disabled = busy;
     $('script-play').disabled = busy || running || ended;
@@ -502,6 +502,8 @@ function startGesture(event) {
         element: effectiveElement(element), resize: event.target.classList.contains('resize-handle')
     };
     node.setPointerCapture(event.pointerId);
+    renderProperties();
+    renderCanvasControls();
 }
 
 function moveGesture(event) {
@@ -529,6 +531,8 @@ function endGesture(event) {
     gesture = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     void flushPending();
+    renderProperties();
+    renderCanvasControls();
 }
 
 function fitStage(hostId, viewportId, stageId, output = false) {
