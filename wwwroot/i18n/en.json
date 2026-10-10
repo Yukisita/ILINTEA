@@ -84,6 +84,7 @@
   "display.show": "Show in Program",
   "display.hide": "Hide from Program",
   "display.showCancelSchedule": "Cancel schedule and show",
+  "display.hideCancelSchedule": "Cancel schedule and hide",
   "display.delayLabel": "Show after a delay",
   "display.delayAria": "Delay before showing",
   "display.unit": "Unit",

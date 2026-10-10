@@ -84,6 +84,7 @@
   "display.show": "Programに表示",
   "display.hide": "Programから隠す",
   "display.showCancelSchedule": "予約を解除して表示",
+  "display.hideCancelSchedule": "予約を解除して非表示",
   "display.delayLabel": "指定時間後に表示",
   "display.delayAria": "表示まで",
   "display.unit": "単位",

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261010-language">
-  <script type="module" src="/app.js?v=20261010-language"></script>
+  <link rel="stylesheet" href="/app.css?v=20261010-visibility">
+  <script type="module" src="/app.js?v=20261010-visibility"></script>
 </head>
 <body>
   <header class="navbar">
@@ -76,7 +76,7 @@
           </div>
           <section class="display-panel" aria-labelledby="display-heading">
             <div class="display-heading"><h3 id="display-heading" data-i18n="display.title"></h3><span id="display-state" class="display-state" role="status"></span></div>
-            <div class="visibility-actions"><button id="show-element" class="primary" type="button" data-i18n="display.show"></button><button id="hide-element" type="button" data-i18n="display.hide"></button></div>
+            <div class="visibility-actions"><button id="toggle-visibility" class="primary" type="button" aria-describedby="display-state" data-i18n="display.show"></button></div>
             <div id="display-schedule-fields" class="display-schedule">
               <label for="display-delay" data-i18n="display.delayLabel"></label>
               <div class="delay-inputs"><input id="display-delay" data-i18n-aria-label="display.delayAria" type="number" min="1" max="86400" step="1" value="10"><select id="display-unit" data-i18n-aria-label="display.unit"><option value="1" data-i18n="display.seconds"></option><option value="60" data-i18n="display.minutes"></option></select><button id="schedule-display" type="button" data-i18n="display.schedule"></button></div>

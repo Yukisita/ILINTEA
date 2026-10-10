@@ -332,6 +332,7 @@ function renderDisplayControls() {
     if (viewer || !element) return;
     const waiting = displayIsWaiting(element);
     const visible = element.visible && !waiting;
+    const onProgram = elementIsVisible(element);
     const alarm = element.kind === 'alarm';
     const busy = displayBusy || scriptBusy || !connected || pending.has(element.id) || inFlight.has(element.id);
     $('display-schedule-fields').hidden = alarm;
@@ -350,15 +351,17 @@ function renderDisplayControls() {
         }
     }
     for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || visible;
-    $('show-element').disabled = busy || visible;
-    $('hide-element').disabled = busy || !elementIsVisible(element);
+    $('toggle-visibility').disabled = busy;
+    $('toggle-visibility').classList.toggle('primary', !onProgram);
     $('cancel-display').disabled = busy;
     $('delete-element').disabled = busy;
     $('confirm-delete').disabled = busy;
     $('delete-element').hidden = deleteConfirmId === element.id;
     $('delete-confirmation').hidden = deleteConfirmId !== element.id;
     $('cancel-display').hidden = !waiting;
-    $('show-element').textContent = waiting ? t('display.showCancelSchedule') : t('display.show');
+    $('toggle-visibility').textContent = onProgram
+        ? t(waiting ? 'display.hideCancelSchedule' : 'display.hide')
+        : t(waiting ? 'display.showCancelSchedule' : 'display.show');
     $('schedule-display').textContent = waiting ? t('display.changeSchedule') : t('display.schedule');
     const status = t('display.programState', { state: t(waiting ? alarm && element.showCountdown ? 'state.countdown' : 'state.scheduled' : visible ? 'state.onAir' : 'state.hidden') });
     if ($('display-state').textContent !== status) $('display-state').textContent = status;
@@ -371,10 +374,10 @@ function renderDisplayControls() {
         : visible ? t('display.hideBeforeSchedule') : t('display.hiddenUntilSchedule');
 }
 
-function setElementVisibility(visible) {
+function toggleElementVisibility() {
     const element = selectedElement();
     if (!element || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id)) return;
-    queuePatch(element.id, { visible });
+    queuePatch(element.id, { visible: !elementIsVisible(element) });
     void flushPending();
 }
 
@@ -666,8 +669,7 @@ events.onerror = () => {
 if (!viewer) {
     $('aspect-ratio').addEventListener('change', () => updateCanvas({ aspectRatio: $('aspect-ratio').value }));
     $('background-color').addEventListener('change', () => updateCanvas({ backgroundColor: $('background-color').value }));
-    $('show-element').addEventListener('click', () => setElementVisibility(true));
-    $('hide-element').addEventListener('click', () => setElementVisibility(false));
+    $('toggle-visibility').addEventListener('click', toggleElementVisibility);
     $('schedule-display').addEventListener('click', () => scheduleDisplay());
     $('cancel-display').addEventListener('click', () => scheduleDisplay(true));
     $('display-unit').addEventListener('change', () => { $('display-delay').max = 86400 / Number($('display-unit').value); });
