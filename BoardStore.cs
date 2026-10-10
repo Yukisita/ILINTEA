@@ -1,66 +1,6 @@
-using System.Text.RegularExpressions;
 using System.Threading.Channels;
 
 namespace StreamPrompter;
-
-public record Element(Guid Id, string Kind, double X, double Y, double Width, double Height,
-    string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
-    ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null, bool ShowCountdown = false,
-    long ImageRevision = 0)
-{
-    public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}?v={ImageRevision}" : null;
-}
-
-public record ScriptPlayback(double Speed = 30, double Offset = 0, DateTimeOffset? StartedAt = null)
-{
-    public double PositionAt(DateTimeOffset now) => Offset +
-        (StartedAt is { } start ? Math.Max(0, (now - start).TotalSeconds) * Speed : 0);
-}
-public record ScriptControl(string Action, double? Speed)
-{
-    public bool IsValid() => Action is "play" or "pause" or "reset" ||
-        (Action == "speed" && Speed is >= 5 and <= 200);
-}
-public record DisplaySchedule(Guid Id, DateTimeOffset At);
-public record ScheduleDisplay(int DelaySeconds);
-
-public record ScheduleAlarm(DateTimeOffset At);
-public record CanvasSettings(string AspectRatio = "16:9", string BackgroundColor = "#000000")
-{
-    public double Width => AspectRatio switch { "9:16" => 720, "3:4" => 960, _ => 1280 };
-    public double Height => AspectRatio switch { "16:9" => 720, "4:3" => 960, _ => 1280 };
-}
-public record CanvasPatch(string? AspectRatio, string? BackgroundColor)
-{
-    public bool IsValid() => (AspectRatio is null or "16:9" or "4:3" or "1:1" or "3:4" or "9:16") &&
-        (BackgroundColor is null || Regex.IsMatch(BackgroundColor, @"\A#[0-9a-fA-F]{6}\z"));
-}
-public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, CanvasSettings Canvas);
-public record CreateElement(string Kind, string? Text = null);
-public record MoveElement(int Offset);
-public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
-    int? FontSize, string? Color, string? Align, bool? Visible, bool? ShowCountdown = null)
-{
-    public bool IsValid() =>
-        new[] { X, Y, Width, Height }.All(value => value is null || double.IsFinite(value.Value)) &&
-        (Text is null || UploadLimits.TextFits(Text)) &&
-        (FontSize is null or >= 12 and <= 160) &&
-        (Color is null || Regex.IsMatch(Color, "^#[0-9a-fA-F]{6}$")) &&
-        (Align is null or "left" or "center" or "right");
-}
-
-public record ImageData(byte[] Bytes, string ContentType)
-{
-    public static string? DetectContentType(byte[] bytes)
-    {
-        var span = bytes.AsSpan();
-        if (span.StartsWith(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })) return "image/png";
-        if (span.StartsWith(new byte[] { 255, 216, 255 })) return "image/jpeg";
-        if (span.StartsWith("GIF87a"u8) || span.StartsWith("GIF89a"u8)) return "image/gif";
-        if (span.Length >= 12 && span[..4].SequenceEqual("RIFF"u8) && span.Slice(8, 4).SequenceEqual("WEBP"u8)) return "image/webp";
-        return null;
-    }
-}
 
 // One in-memory board: property patches are serialized so editing text does not overwrite another user's placement.
 public sealed class BoardStore

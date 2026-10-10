@@ -54,6 +54,32 @@ Run("Elements stay within every supported canvas after creation and resizing", (
     }
 });
 
+Run("Canvas and element colors use the same strict validation", () =>
+{
+    foreach (var (color, valid) in new (string?, bool)[]
+    {
+        (null, true), ("#123aBC", true), ("#ffffff", true),
+        ("#fff", false), ("#1234567", false), ("#12345g", false),
+        ("#123456\n", false), ("\n#123456", false), (" #123456", false)
+    })
+    {
+        Equal(valid, new CanvasPatch(null, color).IsValid());
+        Equal(valid, (Patch() with { Color = color }).IsValid());
+    }
+});
+
+Run("Image detection accepts supported signatures and rejects incomplete or unknown data", () =>
+{
+    Equal("image/png", ImageData.DetectContentType([137, 80, 78, 71, 13, 10, 26, 10]));
+    Equal("image/jpeg", ImageData.DetectContentType([255, 216, 255]));
+    Equal("image/gif", ImageData.DetectContentType("GIF87a"u8.ToArray()));
+    Equal("image/gif", ImageData.DetectContentType("GIF89a"u8.ToArray()));
+    Equal("image/webp", ImageData.DetectContentType("RIFFxxxxWEBP"u8.ToArray()));
+    Equal<string?>(null, ImageData.DetectContentType("RIFFxxxxWEB"u8.ToArray()));
+    Equal<string?>(null, ImageData.DetectContentType("unknown"u8.ToArray()));
+    Equal<string?>(null, ImageData.DetectContentType([]));
+});
+
 Console.WriteLine($"{passed} tests passed.");
 
 void Run(string name, Action test)
