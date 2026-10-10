@@ -146,16 +146,5 @@
   "errors.scriptFile": "Choose a TXT file of 1GB or less.",
   "errors.scriptEncoding": "Choose a TXT file saved in UTF-8.",
   "errors.scriptEmpty": "Choose a script that is not blank.",
-  "errors.fullscreen": "Could not enter fullscreen in this browser.",
-  "startup.invalidPort": "Set [Server] Port in StreamPrompter.ini to an integer between 1 and 65535.",
-  "startup.editorLocal": "Editor (this PC): {url}",
-  "startup.viewerLocal": "Viewer (this PC): {url}",
-  "startup.editorLan": "Editor (devices on the same LAN): {url}",
-  "startup.viewerLan": "Viewer (devices on the same LAN): {url}",
-  "startup.stop": "Press Ctrl+C to stop.",
-  "startup.portFailed": "Could not start on port {port}. {detail}",
-  "startup.portAdvice": "Close the app using this port, or change [Server] Port in StreamPrompter.ini and restart.",
-  "startup.exit": "Press Enter to exit.",
-  "startup.portInUse": "Another app is using this port.",
-  "startup.portDenied": "Access was denied. Check whether another app is using the port or the OS has reserved or restricted it."
+  "errors.fullscreen": "Could not enter fullscreen in this browser."
 }

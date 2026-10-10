@@ -146,16 +146,5 @@
   "errors.scriptFile": "1GB以下のTXTファイルを選んでください。",
   "errors.scriptEncoding": "UTF-8で保存したTXTファイルを選んでください。",
   "errors.scriptEmpty": "空欄ではない原稿を選んでください。",
-  "errors.fullscreen": "このブラウザーでは全画面表示を開始できませんでした。",
-  "startup.invalidPort": "StreamPrompter.ini の [Server] Port は1～65535の整数で指定してください。",
-  "startup.editorLocal": "編集画面（このPC）: {url}",
-  "startup.viewerLocal": "閲覧画面（このPC）: {url}",
-  "startup.editorLan": "編集画面（同じLANの端末）: {url}",
-  "startup.viewerLan": "閲覧画面（同じLANの端末）: {url}",
-  "startup.stop": "終了するには Ctrl+C を押してください。",
-  "startup.portFailed": "ポート {port} で起動できませんでした。{detail}",
-  "startup.portAdvice": "使用中のアプリを終了するか、StreamPrompter.ini の [Server] Port を変更して再起動してください。",
-  "startup.exit": "終了するには Enter キーを押してください。",
-  "startup.portInUse": "別のアプリが使用中です。",
-  "startup.portDenied": "使用が拒否されました。別のアプリによる占有や、OSのポート予約・アクセス制限を確認してください。"
+  "errors.fullscreen": "このブラウザーでは全画面表示を開始できませんでした。"
 }

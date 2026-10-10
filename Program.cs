@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddIniFile("StreamPrompter.ini", optional: false, reloadOnChange: false);
 I18n.SetLanguage(builder.Configuration["I18n:Language"]);
 if (!int.TryParse(builder.Configuration["Server:Port"], out var port) || port is < 1 or > 65535)
-    throw new InvalidOperationException(I18n.Text("startup.invalidPort"));
+    throw new InvalidOperationException("Invalid [Server] Port in StreamPrompter.ini. Expected 1-65535.");
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -115,14 +115,12 @@ app.MapGet("/view/", (IWebHostEnvironment environment) =>
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     starting = false;
-    Console.WriteLine(I18n.Text("startup.editorLocal", ("url", $"http://localhost:{port}/")));
-    Console.WriteLine(I18n.Text("startup.viewerLocal", ("url", $"http://localhost:{port}/view/")));
+    Console.WriteLine("StreamPrompter");
+    Console.WriteLine($"  Local:   http://localhost:{port}/");
     if (ViewerLink.FindLanAddress() is { } address)
-    {
-        Console.WriteLine(I18n.Text("startup.editorLan", ("url", $"http://{address}:{port}/")));
-        Console.WriteLine(I18n.Text("startup.viewerLan", ("url", $"http://{address}:{port}/view/")));
-    }
-    Console.WriteLine(I18n.Text("startup.stop"));
+        Console.WriteLine($"  Network: http://{address}:{port}/");
+    Console.WriteLine();
+    Console.WriteLine("Press Ctrl+C to stop.");
 });
 
 try
@@ -131,12 +129,12 @@ try
 }
 catch (Exception exception) when (starting && GetPortError(exception) is { } error)
 {
-    Console.Error.WriteLine(I18n.Text("startup.portFailed", ("port", port), ("detail", error)));
-    Console.Error.WriteLine(I18n.Text("startup.portAdvice"));
+    Console.Error.WriteLine($"Error: Cannot listen on port {port}: {error}");
+    Console.Error.WriteLine("Stop the other app or change [Server] Port in StreamPrompter.ini.");
     Environment.ExitCode = 1;
     if (!Console.IsInputRedirected)
     {
-        Console.WriteLine(I18n.Text("startup.exit"));
+        Console.WriteLine("Press Enter to exit.");
         Console.ReadLine();
     }
 }
@@ -163,9 +161,9 @@ static string? GetPortError(Exception exception)
     for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
     {
         if (cause is AddressInUseException or SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse })
-            return I18n.Text("startup.portInUse");
+            return "address already in use.";
         if (cause is SocketException { SocketErrorCode: SocketError.AccessDenied })
-            return I18n.Text("startup.portDenied");
+            return "permission denied.";
     }
     return null;
 }
