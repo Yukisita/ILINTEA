@@ -1,10 +1,14 @@
+import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage } from '/i18n.js?v=20261010-language';
+
+await initializeI18n();
+
 const $ = (id) => document.getElementById(id);
 const viewer = location.pathname.startsWith('/view');
 document.body.classList.toggle('viewer', viewer);
-if (viewer) document.querySelector('.preview-monitor').setAttribute('aria-label', '閲覧画面');
+if (viewer) document.querySelector('.preview-monitor').setAttribute('aria-label', t('monitor.viewerLabel'));
 $(viewer ? 'view-tab' : 'edit-tab').classList.add('active');
 $(viewer ? 'view-tab' : 'edit-tab').setAttribute('aria-current', 'page');
-document.title = `${viewer ? '閲覧' : '編集'} - StreamPrompter`;
+document.title = t('page.title', { mode: t(viewer ? 'navigation.view' : 'navigation.edit') });
 
 let state = { revision: -1, elements: [] };
 let selectedId = null;
@@ -30,7 +34,7 @@ const nodes = new Map();
 const programNodes = new Map();
 const scriptLimits = new Map();
 const programScriptLimits = new Map();
-const kinds = { text: 'テキスト', clock: '時計', image: '画像', script: 'TXT原稿', alarm: 'アラーム' };
+const kinds = { text: 'kind.text', clock: 'kind.clock', image: 'kind.image', script: 'kind.script', alarm: 'kind.alarm' };
 const maxFileBytes = 1024 ** 3;
 const fields = { text: 'text', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height' };
 let flipX = false;
@@ -50,8 +54,11 @@ function notify(message) {
 async function request(path, options = {}) {
     const response = await fetch(path, options);
     if (!response.ok) {
-        let message = '操作を反映できませんでした。もう一度お試しください。';
-        try { message = (await response.json()).error || message; } catch { /* Non-JSON server error. */ }
+        let message = t('errors.request');
+        try {
+            const problem = await response.json();
+            message = problem.errorKey && hasTranslation(problem.errorKey) ? t(problem.errorKey) : problem.error || message;
+        } catch { /* Non-JSON server error. */ }
         throw new Error(message);
     }
     return response.status === 204 ? null : response.json();
@@ -77,7 +84,7 @@ function queuePatch(id, patch) {
     if (!connected || canvasSaving || !state.elements.some((element) => element.id === id)) return;
     if (deleteConfirmId === id) deleteConfirmId = null;
     pending.set(id, { ...pending.get(id), ...patch });
-    $('save-status').textContent = '反映中…';
+    $('save-status').textContent = t('save.pending');
     render();
     clearTimeout(flushTimer);
     flushTimer = setTimeout(flushPending, 100);
@@ -101,7 +108,7 @@ async function flushPending() {
         inFlight.delete(id);
         sending = false;
         render();
-        $('save-status').textContent = pending.size ? '反映中…' : '変更は自動で反映されます';
+        $('save-status').textContent = pending.size ? t('save.pending') : t('save.automatic');
         void flushPending();
     }
 }
@@ -131,15 +138,18 @@ function createElementNode(element, editable) {
     if (element.kind === 'image') {
         const image = document.createElement('img');
         image.src = element.imageUrl;
-        image.alt = '配置した画像';
+        image.alt = t('image.alt');
+        image.setAttribute('data-i18n-alt', 'image.alt');
         content.append(image);
     }
     node.append(content);
     if (editable) {
         const handle = document.createElement('button');
         handle.className = 'resize-handle';
-        handle.title = 'ドラッグでサイズ変更';
-        handle.setAttribute('aria-label', 'サイズ変更（数値でも設定できます）');
+        handle.title = t('resize.title');
+        handle.setAttribute('data-i18n-title', 'resize.title');
+        handle.setAttribute('aria-label', t('resize.label'));
+        handle.setAttribute('data-i18n-aria-label', 'resize.label');
         node.append(handle);
         node.addEventListener('pointerdown', startGesture);
         node.addEventListener('pointermove', moveGesture);
@@ -154,7 +164,7 @@ function renderElement(node, element, editable, limits) {
     const visible = elementIsVisible(element);
     node.hidden = !editable && !visible;
     node.classList.toggle('off-air', editable && !visible);
-    node.dataset.previewState = displayIsWaiting(element) ? '予約中' : '非表示';
+    node.dataset.previewState = displayIsWaiting(element) ? t('state.scheduled') : t('state.hidden');
     node.style.left = `${element.x}px`;
     node.style.top = `${element.y}px`;
     node.style.width = `${element.width}px`;
@@ -215,7 +225,7 @@ function render() {
 }
 
 function renderList() {
-    $('element-count').textContent = `${state.elements.length} / 20件`;
+    $('element-count').textContent = t('elements.count', { count: state.elements.length, limit: 20 });
     const fragment = document.createDocumentFragment();
     for (const original of state.elements) {
         const element = effectiveElement(original);
@@ -225,9 +235,10 @@ function renderList() {
         button.type = 'button';
         button.setAttribute('aria-pressed', String(element.id === selectedId));
         const label = document.createElement('span');
-        label.textContent = `${kinds[element.kind]}${['text', 'script', 'alarm'].includes(element.kind) ? ` · ${element.text.split('\n')[0] || '空欄'}` : ''}`;
+        label.textContent = ['text', 'script', 'alarm'].includes(element.kind)
+            ? t('elements.rowWithText', { kind: t(kinds[element.kind]), text: element.text.split('\n')[0] || t('elements.emptyText') }) : t(kinds[element.kind]);
         const visibility = document.createElement('small');
-        visibility.textContent = displayIsWaiting(element) ? '予約中' : elementIsVisible(element) ? '表示' : '非表示';
+        visibility.textContent = displayIsWaiting(element) ? t('state.scheduled') : elementIsVisible(element) ? t('state.visible') : t('state.hidden');
         button.append(label, visibility);
         button.addEventListener('click', () => select(element.id));
         row.append(button);
@@ -241,14 +252,14 @@ function renderProperties() {
     $('property-fields').hidden = !element;
     $('property-fields').disabled = !connected || canvasSaving;
     $('selection-empty').hidden = !!element;
-    $('property-title').textContent = element ? `${kinds[element.kind]}設定` : '要素の設定';
+    $('property-title').textContent = element ? t('properties.kindTitle', { kind: t(kinds[element.kind]) }) : t('properties.title');
     if (!element) return;
     $('x').max = canvasWidth() - element.width;
     $('y').max = canvasHeight() - element.height;
     $('width').max = canvasWidth();
     $('height').max = canvasHeight();
     $('text-fields').hidden = !['text', 'script', 'alarm'].includes(element.kind);
-    $('text-label').textContent = element.kind === 'alarm' ? '通知メッセージ' : 'テキスト内容';
+    $('text-label').textContent = element.kind === 'alarm' ? t('alarm.message') : t('properties.text');
     if (element.kind === 'script') $('text').removeAttribute('maxlength');
     else $('text').maxLength = 4000;
     $('script-fields').hidden = element.kind !== 'script';
@@ -279,7 +290,7 @@ function remainingTime(element) {
 function renderAlarmElement(node, element, editable) {
     const counting = displayIsWaiting(element) && element.showCountdown;
     const content = node.firstElementChild;
-    const label = counting ? 'アラームまで' : 'アラーム';
+    const label = counting ? t('alarm.countdownLabel') : t('kind.alarm');
     if (content.dataset.alarmLabel !== label) content.dataset.alarmLabel = label;
     const message = counting ? remainingTime(element) : element.text;
     if (content.textContent !== message) content.textContent = message;
@@ -303,7 +314,7 @@ function updateScheduledVisibility() {
         if (!viewer) {
             if (node.classList.contains('off-air') !== offAir) changed = true;
             node.classList.toggle('off-air', offAir);
-            node.dataset.previewState = displayIsWaiting(element) ? '予約中' : '非表示';
+            node.dataset.previewState = displayIsWaiting(element) ? t('state.scheduled') : t('state.hidden');
         }
         const output = viewer ? node : programNodes.get(element.id);
         const hidden = !elementIsVisible(viewer ? element : original);
@@ -329,7 +340,7 @@ function renderDisplayControls() {
     $('schedule-alarm').disabled = busy || visible;
     $('alarm-countdown').disabled = busy;
     if (document.activeElement !== $('alarm-countdown')) $('alarm-countdown').value = String(!!element.showCountdown);
-    $('schedule-alarm').textContent = waiting ? '通知予約を変更' : '通知を予約';
+    $('schedule-alarm').textContent = waiting ? t('alarm.changeSchedule') : t('alarm.schedule');
     if (alarm) {
         const alarmKey = `${element.id}/${element.displaySchedule?.id ?? ''}`;
         if (shownAlarmId !== alarmKey && !alarmFormDirty) {
@@ -347,17 +358,17 @@ function renderDisplayControls() {
     $('delete-element').hidden = deleteConfirmId === element.id;
     $('delete-confirmation').hidden = deleteConfirmId !== element.id;
     $('cancel-display').hidden = !waiting;
-    $('show-element').textContent = waiting ? '予約を解除して表示' : 'Programに表示';
-    $('schedule-display').textContent = waiting ? '予約を変更' : '表示を予約';
-    const status = `Program：${waiting ? alarm && element.showCountdown ? '残時間を表示中' : '予約中' : visible ? '表示中' : '非表示'}`;
+    $('show-element').textContent = waiting ? t('display.showCancelSchedule') : t('display.show');
+    $('schedule-display').textContent = waiting ? t('display.changeSchedule') : t('display.schedule');
+    const status = t('display.programState', { state: t(waiting ? alarm && element.showCountdown ? 'state.countdown' : 'state.scheduled' : visible ? 'state.onAir' : 'state.hidden') });
     if ($('display-state').textContent !== status) $('display-state').textContent = status;
     $('display-state').className = `display-state ${waiting ? 'waiting' : visible ? 'visible' : ''}`;
     $('display-status').textContent = alarm
-        ? waiting ? `残り ${remainingTime(element)}（${alarmFormatter.format(new Date(element.displaySchedule.at))}）。解除後も非表示です。`
-            : visible ? '通知中。再予約する場合は先に非表示にしてください。' : '指定時刻にProgramへ表示します。音は鳴りません。'
+        ? waiting ? t('alarm.waiting', { remaining: remainingTime(element), date: alarmFormatter.format(new Date(element.displaySchedule.at)) })
+            : visible ? t('alarm.hideBeforeSchedule') : t('alarm.hiddenUntilSchedule')
         : waiting
-        ? `あと${Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000)}秒で表示。解除後も非表示です。`
-        : visible ? '予約する場合は、先に非表示にしてください。' : '予約時刻までは非表示のままです。';
+        ? t('display.waiting', { seconds: Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000) })
+        : visible ? t('display.hideBeforeSchedule') : t('display.hiddenUntilSchedule');
 }
 
 function setElementVisibility(visible) {
@@ -373,7 +384,7 @@ async function scheduleDisplay(cancel = false) {
     if (!cancel && elementIsVisible(element)) return;
     const seconds = Number($('display-delay').value) * Number($('display-unit').value);
     if (!cancel && (!Number.isInteger(seconds) || seconds < 1 || seconds > 86400 || !$('display-delay').checkValidity())) {
-        notify('表示までの時間は1秒～24時間で指定してください。');
+        notify(t('errors.displayDelay'));
         return;
     }
     if (cancel && !element.displaySchedule) return;
@@ -394,7 +405,7 @@ async function scheduleAlarm() {
     if (element?.kind !== 'alarm' || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id) || (element.visible && !displayIsWaiting(element))) return;
     const date = new Date($('alarm-at').value);
     if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
-        notify('通知日時は未来の日時を指定してください。');
+        notify(t('errors.alarmFuture'));
         return;
     }
     displayBusy = true;
@@ -429,12 +440,12 @@ function renderScriptControls() {
     $('script-speed').disabled = busy;
     if (document.activeElement !== $('script-speed')) {
         $('script-speed').value = element.playback.speed;
-        $('script-speed-value').textContent = `${element.playback.speed} px/秒`;
+        $('script-speed-value').textContent = t('script.speedValue', { speed: element.playback.speed });
     }
-    const status = waiting ? (running ? '表示予約待ち・表示時刻から再生します' : '表示予約待ち・再生を選ぶと表示時刻から開始します')
-        : limit === 0 ? '原稿全体が表示枠に収まっています。'
-        : ended ? '最後まで表示しました。「先頭へ」で戻せます。'
-        : running ? '再生中・閲覧画面と同期しています' : '停止中';
+    const status = waiting ? (running ? t('script.waitingPlaying') : t('script.waitingStopped'))
+        : limit === 0 ? t('script.fits')
+        : ended ? t('script.ended')
+        : running ? t('script.playing') : t('script.stopped');
     if ($('script-status').textContent !== status) $('script-status').textContent = status;
 }
 
@@ -531,8 +542,8 @@ function resizeStage() {
     if (!viewer) fitStage('program-host', 'program-viewport', 'program-stage', true);
 }
 
-const clockFormatter = new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-const alarmFormatter = new Intl.DateTimeFormat('ja-JP', {
+let clockFormatter = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+let alarmFormatter = new Intl.DateTimeFormat(locale, {
     month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
 });
 function updateClocks() {
@@ -558,10 +569,10 @@ function renderAlarm() {
     const alarms = state.elements.filter((element) => element.kind === 'alarm');
     const active = alarms.filter(element => elementIsVisible(element) && !displayIsWaiting(element));
     const waiting = alarms.filter(displayIsWaiting);
-    $('viewer-alarm-status').textContent = active.length ? `アラーム ${active.length}件・通知中`
-        : waiting.length ? `アラーム ${waiting.length}件・予約中` : '';
+    $('viewer-alarm-status').textContent = active.length ? t('viewer.alarmActive', { count: active.length })
+        : waiting.length ? t('viewer.alarmWaiting', { count: waiting.length }) : '';
     $('stop-alarm').hidden = active.length === 0;
-    $('stop-alarm').textContent = active.length > 1 ? '通知をすべて止める' : '通知を止める';
+    $('stop-alarm').textContent = active.length > 1 ? t('viewer.stopAllAlarms') : t('viewer.stopAlarm');
     $('stop-alarm').disabled = !connected || alarmSaving;
 }
 
@@ -588,7 +599,7 @@ async function clearAlarm() {
 async function addElement(kind) {
     try {
         const element = await request('/api/elements', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind })
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, ...(kind === 'alarm' ? { text: t('alarm.defaultMessage') } : {}) })
         });
         // The next event supplies the shared state; fetch also covers a delayed event connection.
         await refreshBoard();
@@ -627,7 +638,7 @@ async function updateCanvas(patch) {
 
 function setConnection(value) {
     connected = value;
-    $('connection').textContent = value ? '同期中' : '再接続中…';
+    $('connection').textContent = value ? t('connection.connected') : t('connection.reconnecting');
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
     for (const id of ['add-clock', 'add-text', 'add-image', 'add-script', 'add-alarm']) $(id).disabled = !value;
     $('property-fields').disabled = !value || canvasSaving;
@@ -640,16 +651,16 @@ events.onopen = () => { state = { ...state, revision: -1 }; };
 events.onmessage = (event) => {
     acceptState(JSON.parse(event.data));
     setConnection(true);
-    if (!sending && !pending.size) $('save-status').textContent = '変更は自動で反映されます';
+    if (!sending && !pending.size) $('save-status').textContent = t('save.automatic');
 };
 events.onerror = () => {
     setConnection(false);
     if (pending.size > 0) {
         pending.clear();
-        notify('接続が切れました。未反映の変更は、再接続後にもう一度入力してください。');
+        notify(t('connection.lostChanges'));
         render();
     }
-    $('save-status').textContent = '接続を確認しています…';
+    $('save-status').textContent = t('connection.checking');
 };
 
 if (!viewer) {
@@ -666,12 +677,12 @@ if (!viewer) {
         if (!file) return;
         try {
             if (!/\.txt$/i.test(file.name) || file.size > maxFileBytes)
-                throw new Error('1GB以下のTXTファイルを選んでください。');
+                throw new Error(t('errors.scriptFile'));
             let text;
             try { text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()); }
-            catch { throw new Error('UTF-8で保存したTXTファイルを選んでください。'); }
+            catch { throw new Error(t('errors.scriptEncoding')); }
             text = text.replace(/\r\n?/g, '\n');
-            if (!text.trim()) throw new Error('空欄ではない原稿を選んでください。');
+            if (!text.trim()) throw new Error(t('errors.scriptEmpty'));
             const element = await request('/api/elements', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'script', text })
             });
@@ -683,7 +694,7 @@ if (!viewer) {
     $('script-play').addEventListener('click', () => controlScript('play'));
     $('script-pause').addEventListener('click', () => controlScript('pause'));
     $('script-reset').addEventListener('click', () => controlScript('reset'));
-    $('script-speed').addEventListener('input', () => { $('script-speed-value').textContent = `${$('script-speed').value} px/秒`; });
+    $('script-speed').addEventListener('input', () => { $('script-speed-value').textContent = t('script.speedValue', { speed: $('script-speed').value }); });
     $('script-speed').addEventListener('change', () => controlScript('speed', Number($('script-speed').value)));
     $('alarm-at').addEventListener('input', () => { alarmFormDirty = true; });
     $('alarm-countdown').addEventListener('change', () => {
@@ -699,7 +710,7 @@ if (!viewer) {
         const file = event.target.files[0];
         if (!file) return;
         if (file.size > maxFileBytes) {
-            notify('画像は1GB以下にしてください。');
+            notify(t('errors.imageSize'));
             event.target.value = '';
             return;
         }
@@ -756,11 +767,12 @@ if (!viewer) {
     $('copy-link').addEventListener('click', async () => {
         $('copy-link').disabled = true;
         try {
-            const { url } = await request('/api/viewer-url');
+            const { url: viewerUrl } = await request('/api/viewer-url');
+            const url = withLanguage(viewerUrl);
             try {
                 await navigator.clipboard.writeText(url);
-                notify('閲覧URLをコピーしました。同じLAN内の端末で開いてください。');
-            } catch { window.prompt('この閲覧URLをコピーして、別の端末で開いてください。', url); }
+                notify(t('viewer.urlCopied'));
+            } catch { window.prompt(t('viewer.copyPrompt'), url); }
         } catch (error) { notify(error.message); }
         finally { $('copy-link').disabled = false; }
     });
@@ -768,6 +780,25 @@ if (!viewer) {
         if (pending.size || sending) { event.preventDefault(); event.returnValue = ''; }
     });
 }
+
+$('language').value = locale;
+$('language').addEventListener('change', async (event) => {
+    const select = event.currentTarget;
+    select.disabled = true;
+    try {
+        await changeLanguage(select.value);
+        document.title = t('page.title', { mode: t(viewer ? 'navigation.view' : 'navigation.edit') });
+        if (viewer) document.querySelector('.preview-monitor').setAttribute('aria-label', t('monitor.viewerLabel'));
+        clockFormatter = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+        alarmFormatter = new Intl.DateTimeFormat(locale, {
+            month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+        });
+        $('connection').textContent = connected ? t('connection.connected') : t('connection.reconnecting');
+        $('save-status').textContent = !connected ? t('connection.checking') : pending.size || sending ? t('save.pending') : t('save.automatic');
+        render();
+    } catch { notify(t('errors.language')); }
+    finally { select.value = locale; select.disabled = false; }
+});
 
 $('stop-alarm').addEventListener('click', clearAlarm);
 
@@ -784,7 +815,7 @@ $('flip-x').addEventListener('click', () => { flipX = !flipX; updateMirror(); })
 $('flip-y').addEventListener('click', () => { flipY = !flipY; updateMirror(); });
 $('fullscreen').addEventListener('click', async () => {
     try { await $('stage-host').requestFullscreen(); }
-    catch { notify('このブラウザーでは全画面表示を開始できませんでした。'); }
+    catch { notify(t('errors.fullscreen')); }
 });
 $('exit-fullscreen').addEventListener('click', () => document.exitFullscreen());
 document.addEventListener('fullscreenchange', resizeStage);

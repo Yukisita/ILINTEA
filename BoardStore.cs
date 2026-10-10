@@ -108,7 +108,7 @@ public sealed class BoardStore
                 "clock" => new Element(Guid.NewGuid(), kind, 880, 24, 368, 88, Align: "right"),
                 "image" => new Element(Guid.NewGuid(), kind, 80, 440, 240, 180),
                 "script" => new Element(Guid.NewGuid(), kind, 80, 140, 1120, 420, text ?? "", 48, Playback: new()),
-                "alarm" => new Element(Guid.NewGuid(), kind, 80, 520, 960, 160, "設定した時刻になりました", 40, "#332701"),
+                "alarm" => new Element(Guid.NewGuid(), kind, 80, 520, 960, 160, text ?? I18n.Text("alarm.defaultMessage"), 40, "#332701"),
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "", 56)
             }) with { Visible = false };
             element = ScaleElement(element, canvas.Width / 1280, canvas.Height / 720);

@@ -3,95 +3,98 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>StreamPrompter</title>
-  <link rel="stylesheet" href="/app.css?v=20261007-settings">
-  <script src="/app.js?v=20261007-settings" defer></script>
+  <title data-i18n="app.name"></title>
+  <link rel="stylesheet" href="/app.css?v=20261010-language">
+  <script type="module" src="/app.js?v=20261010-language"></script>
 </head>
 <body>
   <header class="navbar">
-    <a class="brand" href="/">▣ StreamPrompter</a>
+    <a class="brand" href="/" data-i18n="app.brand"></a>
   </header>
   <main>
     <div class="mode-bar">
-      <nav class="mode-tabs" aria-label="画面切り替え"><a href="/" id="edit-tab">編集</a><a href="/view/" id="view-tab">閲覧</a></nav>
-      <div class="mode-actions"><span id="connection" class="connection" role="status">接続中…</span><button id="copy-link" class="editor-only">↗ 閲覧URLをコピー</button></div>
+      <nav class="mode-tabs" data-i18n-aria-label="navigation.label"><a href="/" id="edit-tab" data-i18n="navigation.edit"></a><a href="/view/" id="view-tab" data-i18n="navigation.view"></a></nav>
+      <div class="mode-actions">
+        <label class="language-select" for="language"><span data-i18n="language.label"></span><select id="language"><option value="ja" data-i18n="language.japanese"></option><option value="en" data-i18n="language.english"></option></select></label>
+        <span id="connection" class="connection" role="status" data-i18n="connection.initial"></span><button id="copy-link" class="editor-only" data-i18n="viewer.copyUrl"></button>
+      </div>
     </div>
     <div id="notice" class="notice" role="alert" hidden></div>
     <div class="toolbar editor-only">
-      <div class="button-group"><button id="add-clock" disabled>＋ 時計</button><button id="add-text" disabled>＋ テキスト</button><button id="add-alarm" disabled>＋ アラーム</button><button id="add-image" disabled>＋ 画像</button><button id="add-script" disabled>＋ TXTファイル</button><input id="image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden><input id="script-file" type="file" accept=".txt,text/plain" hidden></div>
-      <div class="canvas-settings"><label for="aspect-ratio">画面比率</label><select id="aspect-ratio" disabled><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="3:4">3:4（縦）</option><option value="9:16">9:16（縦）</option></select><label for="background-color">背景色</label><input id="background-color" type="color" value="#000000" disabled></div>
+      <div class="button-group"><button id="add-clock" disabled data-i18n="add.clock"></button><button id="add-text" disabled data-i18n="add.text"></button><button id="add-alarm" disabled data-i18n="add.alarm"></button><button id="add-image" disabled data-i18n="add.image"></button><button id="add-script" disabled data-i18n="add.script"></button><input id="image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden><input id="script-file" type="file" accept=".txt,text/plain" hidden></div>
+      <div class="canvas-settings"><label for="aspect-ratio" data-i18n="canvas.ratio"></label><select id="aspect-ratio" disabled><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="3:4" data-i18n="canvas.ratioPortrait34"></option><option value="9:16" data-i18n="canvas.ratioPortrait916"></option></select><label for="background-color" data-i18n="canvas.background"></label><input id="background-color" type="color" value="#000000" disabled></div>
     </div>
     <div class="toolbar viewer-only">
-      <span id="viewer-alarm-status" class="muted"></span><div class="button-group"><button id="flip-x" aria-pressed="false">↔ 左右反転</button><button id="flip-y" aria-pressed="false">↕ 上下反転</button><button id="fullscreen">⛶ 全画面</button></div>
+      <span id="viewer-alarm-status" class="muted"></span><div class="button-group"><button id="flip-x" aria-pressed="false" data-i18n="viewer.flipX"></button><button id="flip-y" aria-pressed="false" data-i18n="viewer.flipY"></button><button id="fullscreen" data-i18n="viewer.fullscreen"></button></div>
     </div>
     <div class="workspace">
-      <section class="elements-panel editor-only" aria-label="配置中の要素">
-        <div class="panel-heading"><h2>配置中の要素</h2><span id="element-count" class="muted"></span></div>
+      <section class="elements-panel editor-only" data-i18n-aria-label="elements.title">
+        <div class="panel-heading"><h2 data-i18n="elements.title"></h2><span id="element-count" class="muted"></span></div>
         <div id="element-list"></div>
       </section>
-      <section class="canvas-column" aria-label="表示画面">
+      <section class="canvas-column" data-i18n-aria-label="canvas.title">
         <div class="monitor-grid">
-          <section class="monitor preview-monitor" aria-label="Preview：全要素を編集">
-            <div class="monitor-heading editor-only"><h2><span class="monitor-dot"></span>Preview</h2><span>編集用・すべての要素</span></div>
+          <section class="monitor preview-monitor" data-i18n-aria-label="monitor.previewLabel">
+            <div class="monitor-heading editor-only"><h2><span class="monitor-dot"></span><span data-i18n="monitor.preview"></span></h2><span data-i18n="monitor.previewDescription"></span></div>
             <div id="stage-host" class="stage-host">
               <div id="stage-viewport" class="stage-viewport"><div id="stage" class="stage"></div></div>
-              <button id="exit-fullscreen" class="fullscreen-exit">全画面を終了</button>
-              <button id="stop-alarm" class="stop-alarm viewer-only" hidden>通知を止める</button>
+              <button id="exit-fullscreen" class="fullscreen-exit" data-i18n="viewer.exitFullscreen"></button>
+              <button id="stop-alarm" class="stop-alarm viewer-only" hidden data-i18n="viewer.stopAlarm"></button>
             </div>
-            <p class="monitor-help editor-only">非表示の要素も表示・ドラッグで配置</p>
+            <p class="monitor-help editor-only" data-i18n="monitor.previewHelp"></p>
           </section>
-          <section class="monitor program-monitor editor-only" aria-label="Program：閲覧者への表示">
-            <div class="monitor-heading"><h2><span class="monitor-dot"></span>Program</h2><span>閲覧者への表示</span></div>
+          <section class="monitor program-monitor editor-only" data-i18n-aria-label="monitor.programLabel">
+            <div class="monitor-heading"><h2><span class="monitor-dot"></span><span data-i18n="monitor.program"></span></h2><span data-i18n="monitor.programDescription"></span></div>
             <div id="program-host" class="stage-host">
               <div id="program-viewport" class="stage-viewport"><div id="program-stage" class="stage"></div></div>
             </div>
-            <p class="monitor-help">表示中の要素だけ・閲覧画面と同期</p>
+            <p class="monitor-help" data-i18n="monitor.programHelp"></p>
           </section>
         </div>
-        <div class="canvas-help editor-only"><span>表示中の要素への編集はProgramにも反映されます</span><span id="save-status" role="status">変更は自動で反映されます</span></div>
+        <div class="canvas-help editor-only"><span data-i18n="canvas.liveEdits"></span><span id="save-status" role="status" data-i18n="save.automatic"></span></div>
       </section>
-      <aside class="properties editor-only" aria-label="要素の設定">
-        <h2 id="property-title">要素の設定</h2>
-        <p id="selection-empty" class="empty-state">要素一覧から選ぶと、<br>内容・位置・表示を変更できます。</p>
+      <aside class="properties editor-only" data-i18n-aria-label="properties.title">
+        <h2 id="property-title" data-i18n="properties.title"></h2>
+        <p id="selection-empty" class="empty-state" data-i18n="properties.selectionEmpty"></p>
         <fieldset id="property-fields" hidden>
-          <div id="text-fields"><label id="text-label" for="text">テキスト内容</label><textarea id="text" rows="5" maxlength="4000"></textarea></div>
+          <div id="text-fields"><label id="text-label" for="text" data-i18n="properties.text"></label><textarea id="text" rows="5" maxlength="4000"></textarea></div>
           <div id="script-fields" hidden>
-            <label for="script-speed">スクロール速度 <output id="script-speed-value">30 px/秒</output></label>
+            <label for="script-speed"><span data-i18n="script.speed"></span> <output id="script-speed-value"></output></label>
             <input id="script-speed" type="range" min="5" max="200" step="5" value="30">
-            <div class="button-group script-controls"><button id="script-play" type="button">再生</button><button id="script-pause" type="button">一時停止</button><button id="script-reset" type="button">先頭へ</button></div>
+            <div class="button-group script-controls"><button id="script-play" type="button" data-i18n="script.play"></button><button id="script-pause" type="button" data-i18n="script.pause"></button><button id="script-reset" type="button" data-i18n="script.reset"></button></div>
             <p id="script-status" class="muted" role="status"></p>
           </div>
           <div id="type-fields">
-            <div class="field-row"><label for="font-size">文字サイズ</label><input id="font-size" type="number" min="12" max="160"></div>
-            <div class="field-row"><label for="color">文字色</label><input id="color" type="color"></div>
-            <div class="field-row"><label for="align">文字揃え</label><select id="align"><option value="left">左揃え</option><option value="center">中央揃え</option><option value="right">右揃え</option></select></div>
+            <div class="field-row"><label for="font-size" data-i18n="properties.fontSize"></label><input id="font-size" type="number" min="12" max="160"></div>
+            <div class="field-row"><label for="color" data-i18n="properties.color"></label><input id="color" type="color"></div>
+            <div class="field-row"><label for="align" data-i18n="properties.align"></label><select id="align"><option value="left" data-i18n="properties.alignLeft"></option><option value="center" data-i18n="properties.alignCenter"></option><option value="right" data-i18n="properties.alignRight"></option></select></div>
           </div>
-          <h3>位置・サイズ</h3>
+          <h3 data-i18n="position.title"></h3>
           <div class="position-grid">
-            <label>X<input id="x" type="number" min="0" max="1200"></label><label>Y<input id="y" type="number" min="0" max="672"></label>
-            <label>幅<input id="width" type="number" min="80" max="1280"></label><label>高さ<input id="height" type="number" min="48" max="720"></label>
+            <label><span data-i18n="position.x"></span><input id="x" type="number" min="0" max="1200"></label><label><span data-i18n="position.y"></span><input id="y" type="number" min="0" max="672"></label>
+            <label><span data-i18n="position.width"></span><input id="width" type="number" min="80" max="1280"></label><label><span data-i18n="position.height"></span><input id="height" type="number" min="48" max="720"></label>
           </div>
           <section class="display-panel" aria-labelledby="display-heading">
-            <div class="display-heading"><h3 id="display-heading">表示の操作</h3><span id="display-state" class="display-state" role="status"></span></div>
-            <div class="visibility-actions"><button id="show-element" class="primary" type="button">Programに表示</button><button id="hide-element" type="button">Programから隠す</button></div>
+            <div class="display-heading"><h3 id="display-heading" data-i18n="display.title"></h3><span id="display-state" class="display-state" role="status"></span></div>
+            <div class="visibility-actions"><button id="show-element" class="primary" type="button" data-i18n="display.show"></button><button id="hide-element" type="button" data-i18n="display.hide"></button></div>
             <div id="display-schedule-fields" class="display-schedule">
-              <label for="display-delay">指定時間後に表示</label>
-              <div class="delay-inputs"><input id="display-delay" aria-label="表示まで" type="number" min="1" max="86400" step="1" value="10"><select id="display-unit" aria-label="単位"><option value="1">秒後</option><option value="60">分後</option></select><button id="schedule-display" type="button">表示を予約</button></div>
+              <label for="display-delay" data-i18n="display.delayLabel"></label>
+              <div class="delay-inputs"><input id="display-delay" data-i18n-aria-label="display.delayAria" type="number" min="1" max="86400" step="1" value="10"><select id="display-unit" data-i18n-aria-label="display.unit"><option value="1" data-i18n="display.seconds"></option><option value="60" data-i18n="display.minutes"></option></select><button id="schedule-display" type="button" data-i18n="display.schedule"></button></div>
             </div>
             <div id="alarm-settings" class="display-schedule" hidden>
-              <label for="alarm-at">通知日時 <span class="muted">音なし</span></label>
+              <label for="alarm-at"><span data-i18n="alarm.at"></span> <span class="muted" data-i18n="alarm.silent"></span></label>
               <input id="alarm-at" type="datetime-local" step="1" required>
-              <label class="countdown-label" for="alarm-countdown">残時間の表示</label>
-              <select id="alarm-countdown"><option value="false">通知時刻になったら表示</option><option value="true">予約中も残時間を表示</option></select>
-              <button id="schedule-alarm" type="button">通知を予約</button>
+              <label class="countdown-label" for="alarm-countdown" data-i18n="alarm.countdownTitle"></label>
+              <select id="alarm-countdown"><option value="false" data-i18n="alarm.atTimeOnly"></option><option value="true" data-i18n="alarm.showCountdown"></option></select>
+              <button id="schedule-alarm" type="button" data-i18n="alarm.schedule"></button>
             </div>
-            <div class="schedule-status"><p id="display-status" class="muted"></p><button id="cancel-display" type="button" hidden>予約を解除</button></div>
+            <div class="schedule-status"><p id="display-status" class="muted"></p><button id="cancel-display" type="button" hidden data-i18n="display.cancelSchedule"></button></div>
           </section>
-          <div class="delete-actions"><button id="delete-element" class="danger" type="button">要素を削除…</button><div id="delete-confirmation" hidden><span>この要素を削除しますか？</span><button id="confirm-delete" class="danger" type="button">削除する</button><button id="cancel-delete" type="button">キャンセル</button></div></div>
+          <div class="delete-actions"><button id="delete-element" class="danger" type="button" data-i18n="delete.button"></button><div id="delete-confirmation" hidden><span data-i18n="delete.confirmation"></span><button id="confirm-delete" class="danger" type="button" data-i18n="delete.confirm"></button><button id="cancel-delete" type="button" data-i18n="delete.cancel"></button></div></div>
         </fieldset>
       </aside>
     </div>
-    <p class="viewer-help viewer-only">反転はこの端末だけに適用されます。全画面では操作バーが隠れます。</p>
+    <p class="viewer-help viewer-only" data-i18n="viewer.help"></p>
   </main>
 </body>
 </html>

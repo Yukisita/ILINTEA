@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="StreamPrompter.ini" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="wwwroot/i18n/*.json" WithCulture="false" />
   </ItemGroup>
 </Project>
