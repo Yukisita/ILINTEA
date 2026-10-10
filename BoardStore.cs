@@ -134,13 +134,12 @@ public sealed class BoardStore
                 playback = playback with { Offset = playback.PositionAt(now), StartedAt = patch.Visible.Value ? now : null };
             if (patch.Text is not null && patch.Text != current.Text && playback is not null)
                 playback = playback with { Offset = 0, StartedAt = null };
-            var width = Math.Clamp(patch.Width ?? current.Width, 80, canvas.Width);
-            var height = Math.Clamp(patch.Height ?? current.Height, 48, canvas.Height);
-            var updated = current with
+            var updated = ClampElementBounds(current with
             {
-                X = Math.Clamp(patch.X ?? current.X, 0, canvas.Width - width),
-                Y = Math.Clamp(patch.Y ?? current.Y, 0, canvas.Height - height),
-                Width = width, Height = height,
+                X = patch.X ?? current.X,
+                Y = patch.Y ?? current.Y,
+                Width = patch.Width ?? current.Width,
+                Height = patch.Height ?? current.Height,
                 Text = patch.Text ?? current.Text,
                 FontSize = patch.FontSize ?? current.FontSize,
                 Color = patch.Color ?? current.Color,
@@ -149,7 +148,7 @@ public sealed class BoardStore
                 ShowCountdown = patch.ShowCountdown ?? current.ShowCountdown,
                 Playback = playback,
                 DisplaySchedule = patch.Visible is not null ? null : current.DisplaySchedule
-            };
+            });
             elements[index] = updated;
             Publish();
             return updated;
@@ -301,14 +300,22 @@ public sealed class BoardStore
         }
     }
 
-    private Element ScaleElement(Element element, double scaleX, double scaleY)
+    private Element ScaleElement(Element element, double scaleX, double scaleY) => ClampElementBounds(element with
     {
-        var width = Math.Clamp(element.Width * scaleX, 80, canvas.Width);
-        var height = Math.Clamp(element.Height * scaleY, 48, canvas.Height);
+        X = element.X * scaleX,
+        Y = element.Y * scaleY,
+        Width = element.Width * scaleX,
+        Height = element.Height * scaleY
+    });
+
+    private Element ClampElementBounds(Element element)
+    {
+        var width = Math.Clamp(element.Width, 80, canvas.Width);
+        var height = Math.Clamp(element.Height, 48, canvas.Height);
         return element with
         {
-            X = Math.Clamp(element.X * scaleX, 0, canvas.Width - width),
-            Y = Math.Clamp(element.Y * scaleY, 0, canvas.Height - height),
+            X = Math.Clamp(element.X, 0, canvas.Width - width),
+            Y = Math.Clamp(element.Y, 0, canvas.Height - height),
             Width = width, Height = height
         };
     }
