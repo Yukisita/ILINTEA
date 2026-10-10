@@ -5,9 +5,10 @@ namespace StreamPrompter;
 
 public record Element(Guid Id, string Kind, double X, double Y, double Width, double Height,
     string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
-    ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null, bool ShowCountdown = false)
+    ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null, bool ShowCountdown = false,
+    long ImageRevision = 0)
 {
-    public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}" : null;
+    public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}?v={ImageRevision}" : null;
 }
 
 public record ScriptPlayback(double Speed = 30, double Offset = 0, DateTimeOffset? StartedAt = null)
@@ -168,6 +169,19 @@ public sealed class BoardStore
     public ImageData? GetImage(Guid id)
     {
         lock (gate) return images.GetValueOrDefault(id);
+    }
+
+    public Element? ReplaceImage(Guid id, ImageData image)
+    {
+        lock (gate)
+        {
+            var index = elements.FindIndex(element => element.Id == id && element.Kind == "image");
+            if (index < 0) return null;
+            images[id] = image;
+            elements[index] = elements[index] with { ImageRevision = elements[index].ImageRevision + 1 };
+            Publish();
+            return elements[index];
+        }
     }
 
     public Element? ControlScript(Guid id, ScriptControl control)

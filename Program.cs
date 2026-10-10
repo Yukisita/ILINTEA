@@ -100,19 +100,10 @@ app.MapDelete("/api/elements/{id:guid}/display-schedule/{scheduleId:guid}", (Gui
 app.MapDelete("/api/elements/{id:guid}", (Guid id, BoardStore board) =>
     board.Remove(id) ? Results.NoContent() : Results.NotFound(I18n.Error("errors.elementMissing")));
 
-app.MapPost("/api/images", async (IFormFile file, BoardStore board, CancellationToken cancellationToken) =>
-{
-    if (file.Length is <= 0 or > UploadLimits.MaxFileBytes)
-        return Results.BadRequest(I18n.Error("errors.imageSize"));
-    var bytes = new byte[checked((int)file.Length)];
-    using var stream = file.OpenReadStream();
-    await stream.ReadExactlyAsync(bytes, cancellationToken);
-    var contentType = ImageData.DetectContentType(bytes);
-    if (contentType is null)
-        return Results.BadRequest(I18n.Error("errors.imageFormat"));
-    var element = board.Add("image", new ImageData(bytes, contentType));
-    return element is null ? Results.BadRequest(I18n.Error("errors.elementLimit")) : Results.Ok(element);
-}).DisableAntiforgery();
+app.MapPost("/api/images", (IFormFile file, BoardStore board, CancellationToken cancellationToken) =>
+    SaveImage(null, file, board, cancellationToken)).DisableAntiforgery();
+app.MapPut("/api/images/{id:guid}", (Guid id, IFormFile file, BoardStore board, CancellationToken cancellationToken) =>
+    SaveImage(id, file, board, cancellationToken)).DisableAntiforgery();
 
 app.MapGet("/api/images/{id:guid}", (Guid id, BoardStore board) =>
 {
@@ -148,6 +139,23 @@ catch (Exception exception) when (starting && GetPortError(exception) is { } err
         Console.WriteLine(I18n.Text("startup.exit"));
         Console.ReadLine();
     }
+}
+
+static async Task<IResult> SaveImage(Guid? id, IFormFile file, BoardStore board, CancellationToken cancellationToken)
+{
+    if (file.Length is <= 0 or > UploadLimits.MaxFileBytes)
+        return Results.BadRequest(I18n.Error("errors.imageSize"));
+    var bytes = new byte[checked((int)file.Length)];
+    using var stream = file.OpenReadStream();
+    await stream.ReadExactlyAsync(bytes, cancellationToken);
+    var contentType = ImageData.DetectContentType(bytes);
+    if (contentType is null)
+        return Results.BadRequest(I18n.Error("errors.imageFormat"));
+    var image = new ImageData(bytes, contentType);
+    var element = id is { } imageId ? board.ReplaceImage(imageId, image) : board.Add("image", image);
+    if (element is not null) return Results.Ok(element);
+    return id is not null ? Results.NotFound(I18n.Error("errors.elementMissing"))
+        : Results.BadRequest(I18n.Error("errors.elementLimit"));
 }
 
 static string? GetPortError(Exception exception)

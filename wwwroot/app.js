@@ -23,6 +23,7 @@ let alarmSaving = false;
 let alarmFormDirty = false;
 let shownAlarmId = null;
 let scriptBusy = false;
+let imageBusy = false;
 let displayBusy = false;
 let deleteConfirmId = null;
 let canvasSaving = false;
@@ -174,6 +175,10 @@ function renderElement(node, element, editable, limits) {
     node.style.textAlign = element.align;
     node.classList.toggle('selected', editable && element.id === selectedId);
     if (element.kind === 'text') node.firstElementChild.textContent = element.text;
+    if (element.kind === 'image') {
+        const image = node.firstElementChild.firstElementChild;
+        if (image.getAttribute('src') !== element.imageUrl) image.src = element.imageUrl;
+    }
     if (element.kind === 'alarm') renderAlarmElement(node, element, editable);
     if (element.kind === 'script') {
         const script = node.firstElementChild.firstElementChild;
@@ -263,6 +268,8 @@ function renderProperties() {
     if (element.kind === 'script') $('text').removeAttribute('maxlength');
     else $('text').maxLength = 4000;
     $('script-fields').hidden = element.kind !== 'script';
+    $('image-fields').hidden = element.kind !== 'image';
+    $('replace-image').disabled = !connected || imageBusy;
     $('type-fields').hidden = element.kind === 'image';
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);
@@ -644,6 +651,8 @@ function setConnection(value) {
     $('connection').textContent = value ? t('connection.connected') : t('connection.reconnecting');
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
     for (const id of ['add-clock', 'add-text', 'add-image', 'add-script', 'add-alarm']) $(id).disabled = !value;
+    $('add-image').disabled = !value || imageBusy;
+    $('replace-image').disabled = !value || imageBusy;
     $('property-fields').disabled = !value || canvasSaving;
     if (!viewer) renderCanvasControls();
     renderAlarm();
@@ -665,6 +674,28 @@ events.onerror = () => {
     }
     $('save-status').textContent = t('connection.checking');
 };
+
+async function uploadImage(file, id = null) {
+    if (!file || !connected || imageBusy) return;
+    imageBusy = true;
+    $('add-image').disabled = true;
+    renderProperties();
+    try {
+        if (file.size <= 0 || file.size > maxFileBytes) throw new Error(t('errors.imageSize'));
+        const form = new FormData();
+        form.append('file', file);
+        const element = await request(id ? `/api/images/${id}` : '/api/images', {
+            method: id ? 'PUT' : 'POST', body: form
+        });
+        await refreshBoard();
+        if (!id) select(element.id);
+    } catch (error) { notify(error.message); }
+    finally {
+        imageBusy = false;
+        $('add-image').disabled = !connected;
+        renderProperties();
+    }
+}
 
 if (!viewer) {
     $('aspect-ratio').addEventListener('change', () => updateCanvas({ aspectRatio: $('aspect-ratio').value }));
@@ -709,21 +740,23 @@ if (!viewer) {
     $('add-alarm').addEventListener('click', () => addElement('alarm'));
     $('add-image').addEventListener('click', () => $('image-file').click());
     $('image-file').addEventListener('change', async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        if (file.size > maxFileBytes) {
-            notify(t('errors.imageSize'));
-            event.target.value = '';
-            return;
-        }
-        const form = new FormData();
-        form.append('file', file);
-        try {
-            const element = await request('/api/images', { method: 'POST', body: form });
-            await refreshBoard();
-            select(element.id);
-        } catch (error) { notify(error.message); }
-        event.target.value = '';
+        const input = event.currentTarget;
+        await uploadImage(input.files[0]);
+        input.value = '';
+    });
+    let imageReplaceId = null;
+    $('replace-image').addEventListener('click', () => {
+        const element = selectedElement();
+        if (element?.kind !== 'image' || !connected || imageBusy) return;
+        imageReplaceId = element.id;
+        $('replacement-image-file').click();
+    });
+    $('replacement-image-file').addEventListener('change', async (event) => {
+        const input = event.currentTarget;
+        const id = imageReplaceId;
+        imageReplaceId = null;
+        if (id) await uploadImage(input.files[0], id);
+        input.value = '';
     });
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);

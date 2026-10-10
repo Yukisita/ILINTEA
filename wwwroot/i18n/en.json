@@ -71,6 +71,7 @@
   "position.width": "Width",
   "position.height": "Height",
   "image.alt": "Placed image",
+  "image.replace": "Replace image",
   "resize.title": "Drag to resize",
   "resize.label": "Resize (also editable with numbers)",
   "save.pending": "Saving…",

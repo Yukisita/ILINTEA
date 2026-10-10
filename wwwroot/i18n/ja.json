@@ -71,6 +71,7 @@
   "position.width": "幅",
   "position.height": "高さ",
   "image.alt": "配置した画像",
+  "image.replace": "画像を変更",
   "resize.title": "ドラッグでサイズ変更",
   "resize.label": "サイズ変更（数値でも設定できます）",
   "save.pending": "反映中…",
