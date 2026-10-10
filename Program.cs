@@ -17,8 +17,8 @@ builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
 // Report expected port conflicts below; retain normal host diagnostics once running.
 builder.Logging.AddFilter("Microsoft.Extensions.Hosting.Internal.Host", level => !starting || level >= LogLevel.Critical);
 builder.Services.AddSingleton<BoardStore>();
-builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = 3 * 1024 * 1024);
-builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 3 * 1024 * 1024);
+builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = UploadLimits.MaxFileBytes);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = UploadLimits.MaxRequestBodyBytes);
 var app = builder.Build();
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 
@@ -57,8 +57,8 @@ app.MapPost("/api/elements", (CreateElement request, BoardStore board) =>
 {
     if (request.Kind is not ("text" or "clock" or "script" or "alarm"))
         return Results.BadRequest(new { error = "追加する要素の種類を確認してください。" });
-    if (request.Kind == "script" && (string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 50000))
-        return Results.BadRequest(new { error = "TXT原稿は1～50,000文字で指定してください。" });
+    if (request.Kind == "script" && (string.IsNullOrWhiteSpace(request.Text) || !UploadLimits.TextFits(request.Text)))
+        return Results.BadRequest(new { error = "TXT原稿は空欄にせず、UTF-8で1GB以下にしてください。" });
     var element = board.Add(request.Kind, text: request.Text);
     return element is null ? Results.BadRequest(new { error = "要素は20個まで追加できます。" }) : Results.Ok(element);
 });
@@ -101,11 +101,11 @@ app.MapDelete("/api/elements/{id:guid}", (Guid id, BoardStore board) =>
 
 app.MapPost("/api/images", async (IFormFile file, BoardStore board, CancellationToken cancellationToken) =>
 {
-    if (file.Length is <= 0 or > 2 * 1024 * 1024)
-        return Results.BadRequest(new { error = "画像は2MB以下にしてください。" });
-    using var stream = new MemoryStream();
-    await file.CopyToAsync(stream, cancellationToken);
-    var bytes = stream.ToArray();
+    if (file.Length is <= 0 or > UploadLimits.MaxFileBytes)
+        return Results.BadRequest(new { error = "画像は1GB以下にしてください。" });
+    var bytes = new byte[checked((int)file.Length)];
+    using var stream = file.OpenReadStream();
+    await stream.ReadExactlyAsync(bytes, cancellationToken);
     var contentType = ImageData.DetectContentType(bytes);
     if (contentType is null)
         return Results.BadRequest(new { error = "PNG・JPEG・GIF・WebPの画像を選んでください。" });

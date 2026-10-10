@@ -41,7 +41,7 @@ public record ElementPatch(double? X, double? Y, double? Width, double? Height, 
 {
     public bool IsValid() =>
         new[] { X, Y, Width, Height }.All(value => value is null || double.IsFinite(value.Value)) &&
-        (Text is null || Text.Length <= 50000) &&
+        (Text is null || UploadLimits.TextFits(Text)) &&
         (FontSize is null or >= 12 and <= 160) &&
         (Color is null || Regex.IsMatch(Color, "^#[0-9a-fA-F]{6}$")) &&
         (Align is null or "left" or "center" or "right");

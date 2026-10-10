@@ -31,6 +31,7 @@ const programNodes = new Map();
 const scriptLimits = new Map();
 const programScriptLimits = new Map();
 const kinds = { text: 'テキスト', clock: '時計', image: '画像', script: 'TXT原稿', alarm: 'アラーム' };
+const maxFileBytes = 1024 ** 3;
 const fields = { text: 'text', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height' };
 let flipX = false;
 let flipY = false;
@@ -248,7 +249,8 @@ function renderProperties() {
     $('height').max = canvasHeight();
     $('text-fields').hidden = !['text', 'script', 'alarm'].includes(element.kind);
     $('text-label').textContent = element.kind === 'alarm' ? '通知メッセージ' : 'テキスト内容';
-    $('text').maxLength = element.kind === 'script' ? 50000 : 4000;
+    if (element.kind === 'script') $('text').removeAttribute('maxlength');
+    else $('text').maxLength = 4000;
     $('script-fields').hidden = element.kind !== 'script';
     $('type-fields').hidden = element.kind === 'image';
     for (const [id, property] of Object.entries(fields)) {
@@ -663,13 +665,13 @@ if (!viewer) {
         const file = event.target.files[0];
         if (!file) return;
         try {
-            if (!/\.txt$/i.test(file.name) || file.size > 256 * 1024)
-                throw new Error('256KB以下のTXTファイルを選んでください。');
+            if (!/\.txt$/i.test(file.name) || file.size > maxFileBytes)
+                throw new Error('1GB以下のTXTファイルを選んでください。');
             let text;
             try { text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()); }
             catch { throw new Error('UTF-8で保存したTXTファイルを選んでください。'); }
             text = text.replace(/\r\n?/g, '\n');
-            if (!text.trim() || text.length > 50000) throw new Error('原稿は1～50,000文字にしてください。');
+            if (!text.trim()) throw new Error('空欄ではない原稿を選んでください。');
             const element = await request('/api/elements', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'script', text })
             });
@@ -696,8 +698,8 @@ if (!viewer) {
     $('image-file').addEventListener('change', async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-            notify('画像は2MB以下にしてください。');
+        if (file.size > maxFileBytes) {
+            notify('画像は1GB以下にしてください。');
             event.target.value = '';
             return;
         }
