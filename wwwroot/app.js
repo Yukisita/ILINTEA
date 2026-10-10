@@ -1,4 +1,5 @@
 import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage } from '/i18n.js?v=20261010-language';
+import { createEditSync } from '/edit-sync.js?v=20261010-refactor-sync';
 
 await initializeI18n();
 
@@ -16,8 +17,6 @@ let connected = false;
 let serverOffset = 0;
 let stageScale = 1;
 let gesture = null;
-let sending = false;
-let flushTimer;
 let noticeTimer;
 let alarmSaving = false;
 let alarmFormDirty = false;
@@ -31,8 +30,18 @@ let canvasSaving = false;
 let orderBusy = false;
 const canvasWidth = () => state.canvas?.width ?? 1280;
 const canvasHeight = () => state.canvas?.height ?? 720;
-const pending = new Map();
-const inFlight = new Map();
+const editSync = createEditSync({
+    sendPatch: (id, patch) => request(`/api/elements/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
+    }),
+    isConnected: () => connected,
+    onChange: () => {
+        render();
+        $('save-status').textContent = !connected ? t('connection.checking')
+            : editSync.hasPending || editSync.sending ? t('save.pending') : t('save.automatic');
+    },
+    onError: error => notify(error.message)
+});
 const nodes = new Map();
 const programNodes = new Map();
 const scriptLimits = new Map();
@@ -68,7 +77,7 @@ async function request(path, options = {}) {
 }
 
 function effectiveElement(element) {
-    const patch = { ...inFlight.get(element.id), ...pending.get(element.id) };
+    const patch = editSync.patchFor(element.id);
     const result = { ...element, ...patch };
     if (typeof patch.visible === 'boolean') result.displaySchedule = null;
     result.width = Math.max(80, Math.min(canvasWidth(), result.width));
@@ -86,34 +95,7 @@ function selectedElement() {
 function queuePatch(id, patch) {
     if (!connected || canvasSaving || scriptLoadingId === id || !state.elements.some((element) => element.id === id)) return;
     if (deleteConfirmId === id) deleteConfirmId = null;
-    pending.set(id, { ...pending.get(id), ...patch });
-    $('save-status').textContent = t('save.pending');
-    render();
-    clearTimeout(flushTimer);
-    flushTimer = setTimeout(flushPending, 100);
-}
-
-// Send patches in order; newer edits stay visible while a previous request is being sent.
-async function flushPending() {
-    if (sending || pending.size === 0 || !connected) return;
-    const [id, patch] = pending.entries().next().value;
-    pending.delete(id);
-    inFlight.set(id, patch);
-    sending = true;
-    try {
-        await request(`/api/elements/${id}`, {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
-        });
-    } catch (error) {
-        pending.delete(id);
-        notify(error.message);
-    } finally {
-        inFlight.delete(id);
-        sending = false;
-        render();
-        $('save-status').textContent = pending.size ? t('save.pending') : t('save.automatic');
-        void flushPending();
-    }
+    editSync.queue(id, patch);
 }
 
 function select(id) {
@@ -203,7 +185,7 @@ function render() {
                 collection.delete(id);
                 scriptLimits.delete(id);
                 programScriptLimits.delete(id);
-                pending.delete(id);
+                editSync.discard(id);
             }
         }
     }
@@ -374,7 +356,7 @@ function renderDisplayControls() {
     const visible = element.visible && !waiting;
     const onProgram = elementIsVisible(element);
     const alarm = element.kind === 'alarm';
-    const busy = displayBusy || scriptBusy || !connected || gesture?.id === element.id || pending.has(element.id) || inFlight.has(element.id);
+    const busy = displayBusy || scriptBusy || !connected || gesture?.id === element.id || editSync.hasChanges(element.id);
     $('display-schedule-fields').hidden = alarm;
     $('alarm-settings').hidden = !alarm;
     $('alarm-at').disabled = busy || visible;
@@ -416,14 +398,14 @@ function renderDisplayControls() {
 
 function toggleElementVisibility() {
     const element = selectedElement();
-    if (!element || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id)) return;
+    if (!element || !connected || displayBusy || scriptBusy || editSync.hasChanges(element.id)) return;
     queuePatch(element.id, { visible: !elementIsVisible(element) });
-    void flushPending();
+    void editSync.flush();
 }
 
 async function scheduleDisplay(cancel = false) {
     const element = selectedElement();
-    if (!element || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id)) return;
+    if (!element || !connected || displayBusy || scriptBusy || editSync.hasChanges(element.id)) return;
     if (!cancel && elementIsVisible(element)) return;
     const seconds = Number($('display-delay').value) * Number($('display-unit').value);
     if (!cancel && (!Number.isInteger(seconds) || seconds < 1 || seconds > 86400 || !$('display-delay').checkValidity())) {
@@ -445,7 +427,7 @@ async function scheduleDisplay(cancel = false) {
 
 async function scheduleAlarm() {
     const element = selectedElement();
-    if (element?.kind !== 'alarm' || !connected || displayBusy || scriptBusy || pending.has(element.id) || inFlight.has(element.id) || (element.visible && !displayIsWaiting(element))) return;
+    if (element?.kind !== 'alarm' || !connected || displayBusy || scriptBusy || editSync.hasChanges(element.id) || (element.visible && !displayIsWaiting(element))) return;
     const date = new Date($('alarm-at').value);
     if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
         notify(t('errors.alarmFuture'));
@@ -475,7 +457,7 @@ function renderScriptControls() {
     const limit = scriptLimits.get(element.id) ?? 0;
     const waiting = displayIsWaiting(element);
     const ended = !waiting && scriptPosition(element) >= limit;
-    const busy = !connected || scriptBusy || gesture?.id === element.id || pending.has(element.id) || inFlight.has(element.id);
+    const busy = !connected || scriptBusy || gesture?.id === element.id || editSync.hasChanges(element.id);
     const running = !!element.playback.startedAt;
     $('replace-script').disabled = busy;
     $('script-play').disabled = busy || running || ended;
@@ -552,9 +534,9 @@ function moveGesture(event) {
         y: clamp(element.y + dy, 0, canvasHeight() - element.height)
     });
     // Limit live drag updates to about ten per second without waiting for the drag to finish.
-    if (!sending && performance.now() - (gesture.lastSent || 0) > 100) {
+    if (!editSync.sending && performance.now() - (gesture.lastSent || 0) > 100) {
         gesture.lastSent = performance.now();
-        void flushPending();
+        void editSync.flush();
     }
 }
 
@@ -562,7 +544,7 @@ function endGesture(event) {
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     gesture = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    void flushPending();
+    void editSync.flush();
     renderList();
     renderProperties();
     renderCanvasControls();
@@ -670,11 +652,11 @@ function renderCanvasControls() {
     $('aspect-ratio').value = state.canvas?.aspectRatio ?? '16:9';
     $('background-color').value = state.canvas?.backgroundColor ?? '#000000';
     for (const id of ['aspect-ratio', 'background-color'])
-        $(id).disabled = !connected || canvasSaving || sending || pending.size > 0 || !!gesture;
+        $(id).disabled = !connected || canvasSaving || editSync.sending || editSync.hasPending || !!gesture;
 }
 
 async function updateCanvas(patch) {
-    if (!connected || canvasSaving || sending || pending.size || gesture) return;
+    if (!connected || canvasSaving || editSync.sending || editSync.hasPending || gesture) return;
     canvasSaving = true;
     render();
     try {
@@ -706,12 +688,12 @@ events.onopen = () => { state = { ...state, revision: -1 }; };
 events.onmessage = (event) => {
     acceptState(JSON.parse(event.data));
     setConnection(true);
-    if (!sending && !pending.size) $('save-status').textContent = t('save.automatic');
+    if (!editSync.sending && !editSync.hasPending) $('save-status').textContent = t('save.automatic');
 };
 events.onerror = () => {
     setConnection(false);
-    if (pending.size > 0) {
-        pending.clear();
+    if (editSync.hasPending) {
+        editSync.clearPending();
         notify(t('connection.lostChanges'));
         render();
     }
@@ -741,7 +723,7 @@ async function uploadImage(file, id = null) {
 }
 
 async function loadScriptFile(file, id = null) {
-    if (!file || !connected || scriptBusy || (id && (pending.has(id) || inFlight.has(id)))) return;
+    if (!file || !connected || scriptBusy || (id && editSync.hasChanges(id))) return;
     scriptBusy = true;
     scriptLoadingId = id;
     $('add-script').disabled = true;
@@ -784,7 +766,7 @@ if (!viewer) {
     let scriptReplaceId = null;
     $('replace-script').addEventListener('click', () => {
         const element = selectedElement();
-        if (element?.kind !== 'script' || !connected || scriptBusy || pending.has(element.id) || inFlight.has(element.id)) return;
+        if (element?.kind !== 'script' || !connected || scriptBusy || editSync.hasChanges(element.id)) return;
         scriptReplaceId = element.id;
         $('replacement-script-file').click();
     });
@@ -856,11 +838,11 @@ if (!viewer) {
     });
     $('confirm-delete').addEventListener('click', async () => {
         const element = selectedElement();
-        if (!element || element.id !== deleteConfirmId || !connected || displayBusy || pending.has(element.id) || inFlight.has(element.id)) return;
+        if (!element || element.id !== deleteConfirmId || !connected || displayBusy || editSync.hasChanges(element.id)) return;
         const id = element.id;
         displayBusy = true;
         renderDisplayControls();
-        pending.delete(id);
+        editSync.discard(id);
         try {
             await request(`/api/elements/${id}`, { method: 'DELETE' });
             await refreshBoard();
@@ -883,7 +865,7 @@ if (!viewer) {
         finally { $('copy-link').disabled = false; }
     });
     window.addEventListener('beforeunload', (event) => {
-        if (pending.size || sending) { event.preventDefault(); event.returnValue = ''; }
+        if (editSync.hasPending || editSync.sending) { event.preventDefault(); event.returnValue = ''; }
     });
 }
 
@@ -900,7 +882,7 @@ $('language').addEventListener('change', async (event) => {
             month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
         });
         $('connection').textContent = connected ? t('connection.connected') : t('connection.reconnecting');
-        $('save-status').textContent = !connected ? t('connection.checking') : pending.size || sending ? t('save.pending') : t('save.automatic');
+        $('save-status').textContent = !connected ? t('connection.checking') : editSync.hasPending || editSync.sending ? t('save.pending') : t('save.automatic');
         render();
     } catch { notify(t('errors.language')); }
     finally { select.value = locale; select.disabled = false; }
