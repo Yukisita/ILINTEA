@@ -64,12 +64,7 @@ public record ImageData(byte[] Bytes, string ContentType)
 public sealed class BoardStore
 {
     private readonly object gate = new();
-    private readonly List<Element> elements =
-    [
-        new(Guid.NewGuid(), "clock", 880, 24, 368, 88, FontSize: 64, Align: "right"),
-        new(Guid.NewGuid(), "text", 80, 220, 1120, 220, "次は新コーナーです\nカメラを見て、お話しください"),
-        new(Guid.NewGuid(), "text", 80, 592, 1120, 88, "このあと ゲスト紹介", 48, "#ffff00", "center")
-    ];
+    private readonly List<Element> elements = [];
     private readonly Dictionary<Guid, ImageData> images = [];
     private readonly Dictionary<Guid, Channel<BoardSnapshot>> subscribers = [];
     private long revision;
