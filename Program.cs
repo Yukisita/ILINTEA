@@ -64,6 +64,13 @@ app.MapPost("/api/elements", (CreateElement request, BoardStore board) =>
     return element is null ? Results.BadRequest(I18n.Error("errors.elementLimit")) : Results.Ok(element);
 });
 
+app.MapPost("/api/elements/{id:guid}/order", (Guid id, MoveElement request, BoardStore board) =>
+{
+    if (request.Offset is not (-1 or 1)) return Results.BadRequest(I18n.Error("errors.elementOrder"));
+    var snapshot = board.Move(id, request.Offset);
+    return snapshot is null ? Results.NotFound(I18n.Error("errors.elementMissing")) : Results.Ok(snapshot);
+});
+
 app.MapPost("/api/elements/{id:guid}/playback", (Guid id, ScriptControl control, BoardStore board) =>
 {
     if (!control.IsValid()) return Results.BadRequest(I18n.Error("errors.scriptSpeed"));

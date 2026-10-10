@@ -37,6 +37,7 @@ public record CanvasPatch(string? AspectRatio, string? BackgroundColor)
 }
 public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, CanvasSettings Canvas);
 public record CreateElement(string Kind, string? Text = null);
+public record MoveElement(int Offset);
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
     int? FontSize, string? Color, string? Align, bool? Visible, bool? ShowCountdown = null)
 {
@@ -113,7 +114,7 @@ public sealed class BoardStore
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "", 56)
             }) with { Visible = false };
             element = ScaleElement(element, canvas.Width / 1280, canvas.Height / 720);
-            elements.Add(element);
+            elements.Insert(0, element);
             if (image is not null) images.Add(element.Id, image);
             Publish();
             return element;
@@ -152,6 +153,25 @@ public sealed class BoardStore
             elements[index] = updated;
             Publish();
             return updated;
+        }
+    }
+
+    public BoardSnapshot? Move(Guid id, int offset)
+    {
+        lock (gate)
+        {
+            if (offset is not (-1 or 1)) return null;
+            var index = elements.FindIndex(element => element.Id == id);
+            if (index < 0) return null;
+            var target = Math.Clamp(index + offset, 0, elements.Count - 1);
+            if (target != index)
+            {
+                var element = elements[index];
+                elements.RemoveAt(index);
+                elements.Insert(target, element);
+                Publish();
+            }
+            return SnapshotCore();
         }
     }
 

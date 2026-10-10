@@ -28,6 +28,7 @@ let imageBusy = false;
 let displayBusy = false;
 let deleteConfirmId = null;
 let canvasSaving = false;
+let orderBusy = false;
 const canvasWidth = () => state.canvas?.width ?? 1280;
 const canvasHeight = () => state.canvas?.height ?? 720;
 const pending = new Map();
@@ -162,13 +163,14 @@ function createElementNode(element, editable) {
     return node;
 }
 
-function renderElement(node, element, editable, limits) {
+function renderElement(node, element, editable, limits, layer) {
     const visible = elementIsVisible(element);
     node.hidden = !editable && !visible;
     node.classList.toggle('off-air', editable && !visible);
     node.dataset.previewState = displayIsWaiting(element) ? t('state.scheduled') : t('state.hidden');
     node.style.left = `${element.x}px`;
     node.style.top = `${element.y}px`;
+    node.style.zIndex = layer;
     node.style.width = `${element.width}px`;
     node.style.height = `${element.height}px`;
     node.style.fontSize = `${element.fontSize}px`;
@@ -205,14 +207,15 @@ function render() {
             }
         }
     }
-    for (const original of state.elements) {
+    for (const [index, original] of state.elements.entries()) {
+        const layer = String(state.elements.length - index);
         const element = effectiveElement(original);
         if (!nodes.has(element.id)) {
             const node = createElementNode(element, !viewer);
             nodes.set(element.id, node);
             $('stage').append(node);
         }
-        renderElement(nodes.get(element.id), element, !viewer, scriptLimits);
+        renderElement(nodes.get(element.id), element, !viewer, scriptLimits, layer);
         if (!viewer) {
             if (!programNodes.has(original.id)) {
                 const node = createElementNode(original, false);
@@ -220,7 +223,7 @@ function render() {
                 $('program-stage').append(node);
             }
             // Program uses the shared state, just like the viewer, rather than unsent edits.
-            renderElement(programNodes.get(original.id), original, false, programScriptLimits);
+            renderElement(programNodes.get(original.id), original, false, programScriptLimits, layer);
         }
     }
     updateClocks();
@@ -233,11 +236,12 @@ function render() {
 function renderList() {
     $('element-count').textContent = t('elements.count', { count: state.elements.length, limit: 20 });
     const fragment = document.createDocumentFragment();
-    for (const original of state.elements) {
+    for (const [index, original] of state.elements.entries()) {
         const element = effectiveElement(original);
         const row = document.createElement('div');
         row.className = `element-row${element.id === selectedId ? ' active' : ''}`;
         const button = document.createElement('button');
+        button.className = 'element-select';
         button.type = 'button';
         button.setAttribute('aria-pressed', String(element.id === selectedId));
         const label = document.createElement('span');
@@ -248,9 +252,36 @@ function renderList() {
         button.append(label, visibility);
         button.addEventListener('click', () => select(element.id));
         row.append(button);
+        const order = document.createElement('div');
+        order.className = 'layer-controls';
+        for (const [offset, symbol, key] of [[-1, '↑', 'elements.moveUp'], [1, '↓', 'elements.moveDown']]) {
+            const move = document.createElement('button');
+            move.type = 'button';
+            move.textContent = symbol;
+            move.title = t(key);
+            move.setAttribute('aria-label', t(key));
+            move.disabled = !connected || orderBusy || !!gesture || canvasSaving
+                || (offset < 0 ? index === 0 : index === state.elements.length - 1);
+            move.addEventListener('click', () => moveElement(element.id, offset));
+            order.append(move);
+        }
+        row.append(order);
         fragment.append(row);
     }
     $('element-list').replaceChildren(fragment);
+}
+
+async function moveElement(id, offset) {
+    if (!connected || orderBusy || gesture || canvasSaving) return;
+    orderBusy = true;
+    renderList();
+    try {
+        const snapshot = await request(`/api/elements/${id}/order`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ offset })
+        });
+        acceptState(snapshot);
+    } catch (error) { notify(error.message); }
+    finally { orderBusy = false; renderList(); }
 }
 
 function renderProperties() {
@@ -502,6 +533,7 @@ function startGesture(event) {
         element: effectiveElement(element), resize: event.target.classList.contains('resize-handle')
     };
     node.setPointerCapture(event.pointerId);
+    renderList();
     renderProperties();
     renderCanvasControls();
 }
@@ -531,6 +563,7 @@ function endGesture(event) {
     gesture = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     void flushPending();
+    renderList();
     renderProperties();
     renderCanvasControls();
 }
@@ -654,6 +687,7 @@ async function updateCanvas(patch) {
 }
 
 function setConnection(value) {
+    const changed = connected !== value;
     connected = value;
     $('connection').textContent = value ? t('connection.connected') : t('connection.reconnecting');
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
@@ -663,6 +697,7 @@ function setConnection(value) {
     $('replace-image').disabled = !value || imageBusy;
     $('property-fields').disabled = !value || canvasSaving || (scriptLoadingId !== null && selectedId === scriptLoadingId);
     if (!viewer) renderCanvasControls();
+    if (!viewer && changed) renderList();
     renderAlarm();
 }
 

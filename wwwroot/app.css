@@ -110,13 +110,15 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid #e9ecef; paddin
 .empty-state { font-size: 13px; line-height: 1.8; color: #6c757d; padding: 22px 16px; margin: 0; white-space: pre-line; }
 .panel-heading { display: flex; justify-content: space-between; padding: 13px 16px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
 #element-list { padding: 8px; }
-.element-row { display: flex; gap: 8px; align-items: center; border: 1px solid transparent; border-radius: 4px; }
+.element-row { display: flex; gap: 4px; align-items: center; border: 1px solid transparent; border-radius: 4px; }
 .element-row.active { background: #e7f1ff; border-color: #b6d4fe; }
-.element-row > button { min-width: 0; width: 100%; display: flex; gap: 14px; text-align: left; background: transparent; border: 0; color: #212529; padding: 10px; }
-.element-row > button:hover { background: #0d6efd0b; }
+.element-row > .element-select { flex: 1; min-width: 0; display: flex; gap: 14px; text-align: left; background: transparent; border: 0; color: #212529; padding: 10px; }
+.element-row > .element-select:hover { background: #0d6efd0b; }
 .element-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.element-row > button span { flex: 1; }
+.element-row > .element-select span { flex: 1; }
 .element-row small { flex: none; color: #6c757d; }
+.layer-controls { display: flex; flex: none; gap: 2px; padding-right: 3px; }
+.layer-controls button { width: 24px; height: 24px; padding: 0; font-size: 13px; }
 .notice { padding: 12px 16px; background: #fff3cd; border: 1px solid #ffe69c; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
 .stop-alarm { position: absolute; z-index: 102; top: 10px; left: 10px; color: #332701; background: #fff3cd; border-color: #ffc107; box-shadow: 0 2px 6px #0003; }
 .stop-alarm:hover { background: #ffe69c; }
@@ -152,7 +154,8 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid #e9ecef; paddin
   .elements-panel .panel-heading { padding: 12px 10px; }
   #element-list { padding: 6px; }
   .element-row { height: 28px; }
-  body:not(.viewer) .element-row > button { gap: 6px; padding: 4px 6px; font-size: 13px; }
+  body:not(.viewer) .element-row > .element-select { gap: 6px; padding: 4px 6px; font-size: 13px; }
+  body:not(.viewer) .layer-controls button { padding: 0; }
   .element-row small { font-size: 10px; }
   .properties > h2 { padding: 10px 12px; }
   .properties fieldset { padding: 10px 12px; }
