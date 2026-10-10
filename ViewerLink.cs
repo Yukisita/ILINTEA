@@ -19,7 +19,19 @@ internal static class ViewerLink
         // A LAN address or hostname used to open the editor is already suitable for sharing.
         if (localOnly)
         {
-            var address = NetworkInterface.GetAllNetworkInterfaces()
+            var address = FindLanAddress();
+            if (address is null) return null;
+            host = new HostString(address.ToString(), host.Port ?? request.HttpContext.Connection.LocalPort);
+        }
+
+        return UriHelper.BuildAbsolute(request.Scheme, host, request.PathBase, "/view/");
+    }
+
+    public static IPAddress? FindLanAddress()
+    {
+        try
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
                 .Where(network => network.OperationalStatus == OperationalStatus.Up
                     && network.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel))
                 .Select(network => network.GetIPProperties())
@@ -31,10 +43,10 @@ internal static class ViewerLink
                 .FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork
                     && !IPAddress.IsLoopback(address) && !address.Equals(IPAddress.Any)
                     && !(address.GetAddressBytes()[0] == 169 && address.GetAddressBytes()[1] == 254));
-            if (address is null) return null;
-            host = new HostString(address.ToString(), host.Port ?? request.HttpContext.Connection.LocalPort);
         }
-
-        return UriHelper.BuildAbsolute(request.Scheme, host, request.PathBase, "/view/");
+        catch (NetworkInformationException)
+        {
+            return null;
+        }
     }
 }

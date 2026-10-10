@@ -1,7 +1,10 @@
+using System.Net.Sockets;
 using System.Text.Json;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http.Features;
 using StreamPrompter;
 
+var starting = true;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddIniFile("StreamPrompter.ini", optional: false, reloadOnChange: false);
 if (!int.TryParse(builder.Configuration["Server:Port"], out var port) || port is < 1 or > 65535)
@@ -10,6 +13,9 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
+// Report expected port conflicts below; retain normal host diagnostics once running.
+builder.Logging.AddFilter("Microsoft.Extensions.Hosting.Internal.Host", level => !starting || level >= LogLevel.Critical);
 builder.Services.AddSingleton<BoardStore>();
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = 3 * 1024 * 1024);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 3 * 1024 * 1024);
@@ -114,4 +120,43 @@ app.MapGet("/api/images/{id:guid}", (Guid id, BoardStore board) =>
 });
 app.MapGet("/view/", (IWebHostEnvironment environment) =>
     Results.File(Path.Combine(environment.WebRootPath, "index.html"), "text/html; charset=utf-8"));
-app.Run();
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    starting = false;
+    Console.WriteLine($"編集画面（このPC）: http://localhost:{port}/");
+    Console.WriteLine($"閲覧画面（このPC）: http://localhost:{port}/view/");
+    if (ViewerLink.FindLanAddress() is { } address)
+    {
+        Console.WriteLine($"編集画面（同じLANの端末）: http://{address}:{port}/");
+        Console.WriteLine($"閲覧画面（同じLANの端末）: http://{address}:{port}/view/");
+    }
+    Console.WriteLine("終了するには Ctrl+C を押してください。");
+});
+
+try
+{
+    await app.RunAsync();
+}
+catch (Exception exception) when (starting && GetPortError(exception) is { } error)
+{
+    Console.Error.WriteLine($"ポート {port} で起動できませんでした。{error}");
+    Console.Error.WriteLine("使用中のアプリを終了するか、StreamPrompter.ini の [Server] Port を変更して再起動してください。");
+    Environment.ExitCode = 1;
+    if (!Console.IsInputRedirected)
+    {
+        Console.WriteLine("終了するには Enter キーを押してください。");
+        Console.ReadLine();
+    }
+}
+
+static string? GetPortError(Exception exception)
+{
+    for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
+    {
+        if (cause is AddressInUseException or SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse })
+            return "別のアプリが使用中です。";
+        if (cause is SocketException { SocketErrorCode: SocketError.AccessDenied })
+            return "使用が拒否されました。別のアプリによる占有や、OSのポート予約・アクセス制限を確認してください。";
+    }
+    return null;
+}
