@@ -112,6 +112,7 @@
   "alarm.hiddenUntilSchedule": "Appears in Program at the set time. No sound.",
   "alarm.defaultMessage": "The scheduled time has arrived",
   "script.speed": "Scroll speed",
+  "script.replace": "Replace TXT file",
   "script.speedValue": "{speed} px/s",
   "script.play": "Play",
   "script.pause": "Pause",

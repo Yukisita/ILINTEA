@@ -23,6 +23,7 @@ let alarmSaving = false;
 let alarmFormDirty = false;
 let shownAlarmId = null;
 let scriptBusy = false;
+let scriptLoadingId = null;
 let imageBusy = false;
 let displayBusy = false;
 let deleteConfirmId = null;
@@ -82,7 +83,7 @@ function selectedElement() {
 }
 
 function queuePatch(id, patch) {
-    if (!connected || canvasSaving || !state.elements.some((element) => element.id === id)) return;
+    if (!connected || canvasSaving || scriptLoadingId === id || !state.elements.some((element) => element.id === id)) return;
     if (deleteConfirmId === id) deleteConfirmId = null;
     pending.set(id, { ...pending.get(id), ...patch });
     $('save-status').textContent = t('save.pending');
@@ -255,7 +256,7 @@ function renderList() {
 function renderProperties() {
     const element = selectedElement();
     $('property-fields').hidden = !element;
-    $('property-fields').disabled = !connected || canvasSaving;
+    $('property-fields').disabled = !connected || canvasSaving || element?.id === scriptLoadingId;
     $('selection-empty').hidden = !!element;
     $('property-title').textContent = element ? t('properties.kindTitle', { kind: t(kinds[element.kind]) }) : t('properties.title');
     if (!element) return;
@@ -268,6 +269,7 @@ function renderProperties() {
     if (element.kind === 'script') $('text').removeAttribute('maxlength');
     else $('text').maxLength = 4000;
     $('script-fields').hidden = element.kind !== 'script';
+    $('script-file-fields').hidden = element.kind !== 'script';
     $('image-fields').hidden = element.kind !== 'image';
     $('replace-image').disabled = !connected || imageBusy;
     $('type-fields').hidden = element.kind === 'image';
@@ -444,6 +446,7 @@ function renderScriptControls() {
     const ended = !waiting && scriptPosition(element) >= limit;
     const busy = !connected || scriptBusy || pending.has(element.id) || inFlight.has(element.id);
     const running = !!element.playback.startedAt;
+    $('replace-script').disabled = busy;
     $('script-play').disabled = busy || running || ended;
     $('script-pause').disabled = busy || !running;
     $('script-reset').disabled = busy;
@@ -652,8 +655,9 @@ function setConnection(value) {
     $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
     for (const id of ['add-clock', 'add-text', 'add-image', 'add-script', 'add-alarm']) $(id).disabled = !value;
     $('add-image').disabled = !value || imageBusy;
+    $('add-script').disabled = !value || scriptBusy;
     $('replace-image').disabled = !value || imageBusy;
-    $('property-fields').disabled = !value || canvasSaving;
+    $('property-fields').disabled = !value || canvasSaving || (scriptLoadingId !== null && selectedId === scriptLoadingId);
     if (!viewer) renderCanvasControls();
     renderAlarm();
 }
@@ -697,6 +701,34 @@ async function uploadImage(file, id = null) {
     }
 }
 
+async function loadScriptFile(file, id = null) {
+    if (!file || !connected || scriptBusy || (id && (pending.has(id) || inFlight.has(id)))) return;
+    scriptBusy = true;
+    scriptLoadingId = id;
+    $('add-script').disabled = true;
+    renderProperties();
+    try {
+        if (!/\.txt$/i.test(file.name) || file.size > maxFileBytes) throw new Error(t('errors.scriptFile'));
+        let text;
+        try { text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()); }
+        catch { throw new Error(t('errors.scriptEncoding')); }
+        text = text.replace(/\r\n?/g, '\n');
+        if (!text.trim()) throw new Error(t('errors.scriptEmpty'));
+        const element = await request(id ? `/api/elements/${id}` : '/api/elements', {
+            method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(id ? { text } : { kind: 'script', text })
+        });
+        await refreshBoard();
+        if (!id) select(element.id);
+    } catch (error) { notify(error.message); }
+    finally {
+        scriptBusy = false;
+        scriptLoadingId = null;
+        $('add-script').disabled = !connected;
+        renderProperties();
+    }
+}
+
 if (!viewer) {
     $('aspect-ratio').addEventListener('change', () => updateCanvas({ aspectRatio: $('aspect-ratio').value }));
     $('background-color').addEventListener('change', () => updateCanvas({ backgroundColor: $('background-color').value }));
@@ -706,23 +738,23 @@ if (!viewer) {
     $('display-unit').addEventListener('change', () => { $('display-delay').max = 86400 / Number($('display-unit').value); });
     $('add-script').addEventListener('click', () => $('script-file').click());
     $('script-file').addEventListener('change', async (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        try {
-            if (!/\.txt$/i.test(file.name) || file.size > maxFileBytes)
-                throw new Error(t('errors.scriptFile'));
-            let text;
-            try { text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer()); }
-            catch { throw new Error(t('errors.scriptEncoding')); }
-            text = text.replace(/\r\n?/g, '\n');
-            if (!text.trim()) throw new Error(t('errors.scriptEmpty'));
-            const element = await request('/api/elements', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'script', text })
-            });
-            await refreshBoard();
-            select(element.id);
-        } catch (error) { notify(error.message); }
-        finally { event.target.value = ''; }
+        const input = event.currentTarget;
+        await loadScriptFile(input.files[0]);
+        input.value = '';
+    });
+    let scriptReplaceId = null;
+    $('replace-script').addEventListener('click', () => {
+        const element = selectedElement();
+        if (element?.kind !== 'script' || !connected || scriptBusy || pending.has(element.id) || inFlight.has(element.id)) return;
+        scriptReplaceId = element.id;
+        $('replacement-script-file').click();
+    });
+    $('replacement-script-file').addEventListener('change', async (event) => {
+        const input = event.currentTarget;
+        const id = scriptReplaceId;
+        scriptReplaceId = null;
+        if (id) await loadScriptFile(input.files[0], id);
+        input.value = '';
     });
     $('script-play').addEventListener('click', () => controlScript('play'));
     $('script-pause').addEventListener('click', () => controlScript('pause'));

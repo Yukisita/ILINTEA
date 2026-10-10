@@ -112,6 +112,7 @@
   "alarm.hiddenUntilSchedule": "指定時刻にProgramへ表示します。音は鳴りません。",
   "alarm.defaultMessage": "設定した時刻になりました",
   "script.speed": "スクロール速度",
+  "script.replace": "TXTファイルを変更",
   "script.speedValue": "{speed} px/秒",
   "script.play": "再生",
   "script.pause": "一時停止",
