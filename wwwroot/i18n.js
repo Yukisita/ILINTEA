@@ -1,4 +1,4 @@
-export const defaultLocale = 'ja';
+const defaultLocale = 'ja';
 export let locale = defaultLocale;
 let defaults = {};
 let messages = {};

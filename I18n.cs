@@ -1,30 +1,25 @@
-using System.Globalization;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace StreamPrompter;
 
 internal static class I18n
 {
-    public const string DefaultLanguage = "ja";
+    private const string DefaultLanguage = "ja";
     private static readonly Dictionary<string, Dictionary<string, string>> catalogs = LoadCatalogs();
-    public static string Language { get; private set; } = DefaultLanguage;
+    private static string currentLanguage = DefaultLanguage;
 
     public static void SetLanguage(string? language)
     {
         var candidate = (language ?? DefaultLanguage).Replace('_', '-').ToLowerInvariant();
-        Language = catalogs.ContainsKey(candidate) ? candidate
+        currentLanguage = catalogs.ContainsKey(candidate) ? candidate
             : catalogs.ContainsKey(candidate.Split('-')[0]) ? candidate.Split('-')[0] : DefaultLanguage;
     }
 
-    public static string Text(string key, params (string Name, object? Value)[] values)
+    public static string Text(string key)
     {
-        if (!catalogs[Language].TryGetValue(key, out var text)
+        if (!catalogs[currentLanguage].TryGetValue(key, out var text)
             && !catalogs[DefaultLanguage].TryGetValue(key, out text)) return key;
-        var arguments = values.ToDictionary(value => value.Name,
-            value => Convert.ToString(value.Value, CultureInfo.InvariantCulture));
-        return Regex.Replace(text, @"\{([A-Za-z_]\w*)\}", match =>
-            arguments.TryGetValue(match.Groups[1].Value, out var value) ? value ?? "" : match.Value);
+        return text;
     }
 
     public static object Error(string key) => new { error = Text(key), errorKey = key };
