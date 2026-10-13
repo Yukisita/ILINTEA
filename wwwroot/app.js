@@ -1,5 +1,6 @@
 import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage } from '/i18n.js?v=20261010-language';
 import { createEditSync } from '/edit-sync.js?v=20261010-refactor-sync';
+import { bindFilePicker } from '/file-picker.js?v=20261013';
 
 await initializeI18n();
 
@@ -33,15 +34,9 @@ let settingsBusy = false;
 const canvasWidth = () => state.canvas?.width ?? 1280;
 const canvasHeight = () => state.canvas?.height ?? 720;
 const editSync = createEditSync({
-    sendPatch: (id, patch) => request(`/api/elements/${id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
-    }),
+    sendPatch: (id, patch) => requestJson(`/api/elements/${id}`, 'PATCH', patch),
     isConnected: () => connected,
-    onChange: () => {
-        render();
-        $('save-status').textContent = !connected ? t('connection.checking')
-            : editSync.hasPending || editSync.sending ? t('save.pending') : t('save.automatic');
-    },
+    onChange: () => render(),
     onError: error => notify(error.message)
 });
 const nodes = new Map();
@@ -68,6 +63,10 @@ function notify(message) {
 async function request(path, options = {}) {
     const response = await requestResponse(path, options);
     return response.status === 204 ? null : response.json();
+}
+
+function requestJson(path, method, body) {
+    return request(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 }
 
 async function requestResponse(path, options = {}) {
@@ -197,6 +196,7 @@ function renderElement(node, element, editable, limits, layer) {
 }
 
 function render() {
+    renderSyncStatus();
     resizeStage();
     if (!viewer) renderSettingsControls();
     if (!viewer) renderCanvasControls();
@@ -282,9 +282,7 @@ async function moveElement(id, offset) {
     orderBusy = true;
     renderList();
     try {
-        const snapshot = await request(`/api/elements/${id}/order`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ offset })
-        });
+        const snapshot = await requestJson(`/api/elements/${id}/order`, 'POST', { offset });
         acceptState(snapshot);
     } catch (error) { notify(error.message); }
     finally { orderBusy = false; renderList(); }
@@ -441,9 +439,8 @@ async function scheduleDisplay(cancel = false) {
     renderDisplayControls();
     try {
         const path = `/api/elements/${element.id}/display-schedule`;
-        await request(cancel ? `${path}/${element.displaySchedule.id}` : path, cancel ? { method: 'DELETE' } : {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ delaySeconds: seconds })
-        });
+        if (cancel) await request(`${path}/${element.displaySchedule.id}`, { method: 'DELETE' });
+        else await requestJson(path, 'POST', { delaySeconds: seconds });
         await refreshBoard();
     } catch (error) { notify(error.message); }
     finally { displayBusy = false; renderDisplayControls(); }
@@ -460,9 +457,7 @@ async function scheduleAlarm() {
     displayBusy = true;
     renderDisplayControls();
     try {
-        await request(`/api/elements/${element.id}/alarm`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ at: date.toISOString() })
-        });
+        await requestJson(`/api/elements/${element.id}/alarm`, 'PUT', { at: date.toISOString() });
         alarmFormDirty = false;
         await refreshBoard();
     } catch (error) { notify(error.message); }
@@ -519,9 +514,7 @@ async function controlScript(action, speed) {
     scriptBusy = true;
     renderScriptControls();
     try {
-        await request(`/api/elements/${element.id}/playback`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, speed })
-        });
+        await requestJson(`/api/elements/${element.id}/playback`, 'POST', { action, speed });
         await refreshBoard();
     } catch (error) { notify(error.message); }
     finally { scriptBusy = false; renderScriptControls(); }
@@ -642,11 +635,9 @@ async function clearAlarm() {
     try {
         for (const element of alarms) {
             // The schedule ID prevents an old stop action from cancelling a newer reservation.
-            await request(element.displaySchedule
-                ? `/api/elements/${element.id}/display-schedule/${element.displaySchedule.id}`
-                : `/api/elements/${element.id}`, element.displaySchedule ? { method: 'DELETE' } : {
-                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visible: false })
-                });
+            if (element.displaySchedule)
+                await request(`/api/elements/${element.id}/display-schedule/${element.displaySchedule.id}`, { method: 'DELETE' });
+            else await requestJson(`/api/elements/${element.id}`, 'PATCH', { visible: false });
         }
         await refreshBoard();
     } catch (error) { notify(error.message); }
@@ -658,8 +649,8 @@ async function addElement(kind) {
     addBusy = true;
     renderSettingsControls();
     try {
-        const element = await request('/api/elements', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, ...(kind === 'alarm' ? { text: t('alarm.defaultMessage') } : {}) })
+        const element = await requestJson('/api/elements', 'POST', {
+            kind, ...(kind === 'alarm' ? { text: t('alarm.defaultMessage') } : {})
         });
         // The next event supplies the shared state; fetch also covers a delayed event connection.
         await refreshBoard();
@@ -738,24 +729,29 @@ async function updateCanvas(patch) {
     canvasSaving = true;
     render();
     try {
-        await request('/api/canvas', {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
-        });
+        await requestJson('/api/canvas', 'PATCH', patch);
         await refreshBoard();
     } catch (error) { notify(error.message); }
     finally { canvasSaving = false; render(); }
 }
 
+function renderSyncStatus() {
+    $('connection').textContent = connected ? t('connection.connected') : t('connection.reconnecting');
+    $('connection').className = `connection ${connected ? 'connected' : 'disconnected'}`;
+    $('save-status').textContent = !connected ? t('connection.checking')
+        : editSync.hasPending || editSync.sending ? t('save.pending') : t('save.automatic');
+}
+
 function setConnection(value) {
     const changed = connected !== value;
     connected = value;
-    $('connection').textContent = value ? t('connection.connected') : t('connection.reconnecting');
-    $('connection').className = `connection ${value ? 'connected' : 'disconnected'}`;
-    $('replace-image').disabled = !value || settingsBusy || imageBusy;
-    $('property-fields').disabled = !value || settingsBusy || canvasSaving || (scriptLoadingId !== null && selectedId === scriptLoadingId);
-    if (!viewer) renderSettingsControls();
-    if (!viewer) renderCanvasControls();
-    if (!viewer && changed) renderList();
+    renderSyncStatus();
+    if (!viewer) {
+        renderSettingsControls();
+        renderCanvasControls();
+        renderProperties();
+        if (changed) renderList();
+    }
     renderAlarm();
 }
 
@@ -764,7 +760,6 @@ events.onopen = () => { state = { ...state, revision: -1 }; };
 events.onmessage = (event) => {
     acceptState(JSON.parse(event.data));
     setConnection(true);
-    if (!editSync.sending && !editSync.hasPending) $('save-status').textContent = t('save.automatic');
 };
 events.onerror = () => {
     setConnection(false);
@@ -773,7 +768,6 @@ events.onerror = () => {
         notify(t('connection.lostChanges'));
         render();
     }
-    $('save-status').textContent = t('connection.checking');
 };
 
 async function uploadImage(file, id = null) {
@@ -811,10 +805,8 @@ async function loadScriptFile(file, id = null) {
         catch { throw new Error(t('errors.scriptEncoding')); }
         text = text.replace(/\r\n?/g, '\n');
         if (!text.trim()) throw new Error(t('errors.scriptEmpty'));
-        const element = await request(id ? `/api/elements/${id}` : '/api/elements', {
-            method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(id ? { text } : { kind: 'script', text })
-        });
+        const element = await requestJson(id ? `/api/elements/${id}` : '/api/elements',
+            id ? 'PATCH' : 'POST', id ? { text } : { kind: 'script', text });
         await refreshBoard();
         if (!id) select(element.id);
     } catch (error) { notify(error.message); }
@@ -828,39 +820,17 @@ async function loadScriptFile(file, id = null) {
 
 if (!viewer) {
     $('download-settings').addEventListener('click', downloadSettings);
-    $('upload-settings').addEventListener('click', () => {
-        if (!settingsActionBusy()) $('settings-file').click();
-    });
-    $('settings-file').addEventListener('change', async (event) => {
-        const input = event.currentTarget;
-        await uploadSettings(input.files[0]);
-        input.value = '';
-    });
+    bindFilePicker($('upload-settings'), $('settings-file'), uploadSettings, { canOpen: () => !settingsActionBusy() });
     $('aspect-ratio').addEventListener('change', () => updateCanvas({ aspectRatio: $('aspect-ratio').value }));
     $('background-color').addEventListener('change', () => updateCanvas({ backgroundColor: $('background-color').value }));
     $('toggle-visibility').addEventListener('click', toggleElementVisibility);
     $('schedule-display').addEventListener('click', () => scheduleDisplay());
     $('cancel-display').addEventListener('click', () => scheduleDisplay(true));
     $('display-unit').addEventListener('change', () => { $('display-delay').max = 86400 / Number($('display-unit').value); });
-    $('add-script').addEventListener('click', () => $('script-file').click());
-    $('script-file').addEventListener('change', async (event) => {
-        const input = event.currentTarget;
-        await loadScriptFile(input.files[0]);
-        input.value = '';
-    });
-    let scriptReplaceId = null;
-    $('replace-script').addEventListener('click', () => {
-        const element = selectedElement();
-        if (element?.kind !== 'script' || elementActionBusy(element.id)) return;
-        scriptReplaceId = element.id;
-        $('replacement-script-file').click();
-    });
-    $('replacement-script-file').addEventListener('change', async (event) => {
-        const input = event.currentTarget;
-        const id = scriptReplaceId;
-        scriptReplaceId = null;
-        if (id) await loadScriptFile(input.files[0], id);
-        input.value = '';
+    bindFilePicker($('add-script'), $('script-file'), loadScriptFile);
+    bindFilePicker($('replace-script'), $('replacement-script-file'), loadScriptFile, {
+        getTarget: () => selectedElement()?.kind === 'script' ? selectedId : null,
+        canOpen: id => id !== null && !elementActionBusy(id)
     });
     $('script-play').addEventListener('click', () => controlScript('play'));
     $('script-pause').addEventListener('click', () => controlScript('pause'));
@@ -876,25 +846,10 @@ if (!viewer) {
     $('add-clock').addEventListener('click', () => addElement('clock'));
     $('add-text').addEventListener('click', () => addElement('text'));
     $('add-alarm').addEventListener('click', () => addElement('alarm'));
-    $('add-image').addEventListener('click', () => $('image-file').click());
-    $('image-file').addEventListener('change', async (event) => {
-        const input = event.currentTarget;
-        await uploadImage(input.files[0]);
-        input.value = '';
-    });
-    let imageReplaceId = null;
-    $('replace-image').addEventListener('click', () => {
-        const element = selectedElement();
-        if (element?.kind !== 'image' || !connected || settingsBusy || imageBusy) return;
-        imageReplaceId = element.id;
-        $('replacement-image-file').click();
-    });
-    $('replacement-image-file').addEventListener('change', async (event) => {
-        const input = event.currentTarget;
-        const id = imageReplaceId;
-        imageReplaceId = null;
-        if (id) await uploadImage(input.files[0], id);
-        input.value = '';
+    bindFilePicker($('add-image'), $('image-file'), uploadImage);
+    bindFilePicker($('replace-image'), $('replacement-image-file'), uploadImage, {
+        getTarget: () => selectedElement()?.kind === 'image' ? selectedId : null,
+        canOpen: id => id !== null && connected && !settingsBusy && !imageBusy
     });
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);
@@ -966,8 +921,6 @@ $('language').addEventListener('change', async (event) => {
         alarmFormatter = new Intl.DateTimeFormat(locale, {
             month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
         });
-        $('connection').textContent = connected ? t('connection.connected') : t('connection.reconnecting');
-        $('save-status').textContent = !connected ? t('connection.checking') : editSync.hasPending || editSync.sending ? t('save.pending') : t('save.automatic');
         render();
     } catch { notify(t('errors.language')); }
     finally { select.value = locale; select.disabled = false; }
