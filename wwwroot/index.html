@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261010-layer-order">
+  <link rel="stylesheet" href="/app.css?v=20261013-refactor">
   <script type="module" src="/app.js?v=20261013-refactor"></script>
 </head>
 <body>
@@ -42,17 +42,15 @@
               <button id="exit-fullscreen" class="fullscreen-exit" data-i18n="viewer.exitFullscreen"></button>
               <button id="stop-alarm" class="stop-alarm viewer-only" hidden data-i18n="viewer.stopAlarm"></button>
             </div>
-            <p class="monitor-help editor-only" data-i18n="monitor.previewHelp"></p>
           </section>
           <section class="monitor program-monitor editor-only" data-i18n-aria-label="monitor.programLabel">
             <div class="monitor-heading"><h2><span class="monitor-dot"></span><span data-i18n="monitor.program"></span></h2><span data-i18n="monitor.programDescription"></span></div>
             <div id="program-host" class="stage-host">
               <div id="program-viewport" class="stage-viewport"><div id="program-stage" class="stage"></div></div>
             </div>
-            <p class="monitor-help" data-i18n="monitor.programHelp"></p>
           </section>
         </div>
-        <div class="canvas-help editor-only"><span data-i18n="canvas.liveEdits"></span><span id="save-status" role="status" data-i18n="save.automatic"></span></div>
+        <div class="canvas-help editor-only"><span data-i18n="canvas.liveEdits"></span><span id="save-status" role="status"></span></div>
       </section>
       <aside class="properties editor-only" data-i18n-aria-label="properties.title">
         <h2 id="property-title" data-i18n="properties.title"></h2>

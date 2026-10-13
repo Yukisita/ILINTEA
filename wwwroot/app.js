@@ -407,7 +407,8 @@ function renderDisplayControls() {
         ? t(waiting ? 'display.hideCancelSchedule' : 'display.hide')
         : t(waiting ? 'display.showCancelSchedule' : 'display.show');
     $('schedule-display').textContent = waiting ? t('display.changeSchedule') : t('display.schedule');
-    const status = t('display.programState', { state: t(waiting ? alarm && element.showCountdown ? 'state.countdown' : 'state.scheduled' : visible ? 'state.onAir' : 'state.hidden') });
+    const status = t(waiting ? alarm && element.showCountdown ? 'state.countdown' : 'state.scheduled'
+        : visible ? 'state.visible' : 'state.hidden');
     if ($('display-state').textContent !== status) $('display-state').textContent = status;
     $('display-state').className = `display-state ${waiting ? 'waiting' : visible ? 'visible' : ''}`;
     $('display-status').textContent = alarm
@@ -739,7 +740,7 @@ function renderSyncStatus() {
     $('connection').textContent = connected ? t('connection.connected') : t('connection.reconnecting');
     $('connection').className = `connection ${connected ? 'connected' : 'disconnected'}`;
     $('save-status').textContent = !connected ? t('connection.checking')
-        : editSync.hasPending || editSync.sending ? t('save.pending') : t('save.automatic');
+        : editSync.hasPending || editSync.sending ? t('save.pending') : t('save.applied');
 }
 
 function setConnection(value) {

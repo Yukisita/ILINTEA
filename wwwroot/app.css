@@ -44,7 +44,6 @@ main { padding: 20px 24px; max-width: 1800px; margin: auto; }
 .monitor-dot { width: 8px; height: 8px; border-radius: 50%; background: #2ecc85; }
 .program-monitor .monitor-dot { background: #ff5c69; }
 body:not(.viewer) .monitor .stage-host { border: 0; border-radius: 0; padding: 12px; background: #14181c; }
-.monitor-help { color: #cbd0d6; font-size: 11px; margin: 0; padding: 9px 12px; }
 .stage-host { background: #e9ecef; border: 1px solid #dee2e6; border-radius: 7px; padding: 24px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
 .stage-viewport { position: relative; flex: none; overflow: hidden; background: #000; box-shadow: 0 2px 8px #0002; }
 .stage { position: absolute; width: 1280px; height: 720px; left: 0; top: 0; background: #000; transform-origin: top left; overflow: hidden; color: #fff; }
@@ -149,7 +148,7 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid #e9ecef; paddin
   body:not(.viewer) .monitor-grid { flex: 1; min-height: 0; }
   body:not(.viewer) .monitor { min-height: 0; display: flex; flex-direction: column; }
   body:not(.viewer) .monitor .stage-host { --fit-stage-height: 1; flex: 1; min-height: 0; }
-  .monitor-heading, .monitor-help { flex: none; }
+  .monitor-heading { flex: none; }
   .canvas-help { flex: none; padding: 8px 0; font-size: 11px; gap: 6px; }
   .elements-panel .panel-heading { padding: 12px 10px; }
   #element-list { padding: 6px; }
