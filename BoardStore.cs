@@ -94,20 +94,16 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
         }
     }
 
-    public Element? Update(Guid id, ElementPatch patch)
-    {
-        lock (gate)
+    public Element? Update(Guid id, ElementPatch patch) =>
+        UpdateElement(id, current =>
         {
-            var index = elements.FindIndex(element => element.Id == id);
-            if (index < 0) return null;
-            var current = elements[index];
             var now = clock.GetUtcNow();
             var playback = current.Playback;
             if (patch.Visible is not null && current.DisplaySchedule?.At > now && playback?.StartedAt is not null)
                 playback = playback with { Offset = playback.PositionAt(now), StartedAt = patch.Visible.Value ? now : null };
             if (patch.Text is not null && patch.Text != current.Text && playback is not null)
                 playback = playback with { Offset = 0, StartedAt = null };
-            var updated = ClampElementBounds(current with
+            return ClampElementBounds(current with
             {
                 X = patch.X ?? current.X,
                 Y = patch.Y ?? current.Y,
@@ -122,11 +118,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 Playback = playback,
                 DisplaySchedule = patch.Visible is not null ? null : current.DisplaySchedule
             });
-            elements[index] = updated;
-            Publish();
-            return updated;
-        }
-    }
+        });
 
     public BoardSnapshot? Move(Guid id, int offset)
     {
@@ -163,26 +155,16 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
         lock (gate) return images.GetValueOrDefault(id);
     }
 
-    public Element? ReplaceImage(Guid id, ImageData image)
-    {
-        lock (gate)
+    public Element? ReplaceImage(Guid id, ImageData image) =>
+        UpdateElement(id, element =>
         {
-            var index = elements.FindIndex(element => element.Id == id && element.Kind == "image");
-            if (index < 0) return null;
             images[id] = image;
-            elements[index] = elements[index] with { ImageRevision = elements[index].ImageRevision + 1 };
-            Publish();
-            return elements[index];
-        }
-    }
+            return element with { ImageRevision = element.ImageRevision + 1 };
+        }, kind: "image");
 
-    public Element? ControlScript(Guid id, ScriptControl control)
-    {
-        lock (gate)
+    public Element? ControlScript(Guid id, ScriptControl control) =>
+        UpdateElement(id, element =>
         {
-            var index = elements.FindIndex(element => element.Id == id && element.Kind == "script");
-            if (index < 0) return null;
-            var element = elements[index];
             var playback = element.Playback!;
             var now = clock.GetUtcNow();
             var position = playback.PositionAt(now);
@@ -195,61 +177,54 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 "speed" => playback with { Speed = control.Speed!.Value, Offset = position, StartedAt = playback.StartedAt is null ? null : start },
                 _ => playback
             };
-            elements[index] = element with { Playback = playback };
-            Publish();
-            return elements[index];
-        }
-    }
+            return element with { Playback = playback };
+        }, kind: "script");
 
-    public Element? ScheduleDisplay(Guid id, int delaySeconds)
-    {
-        lock (gate)
+    public Element? ScheduleDisplay(Guid id, int delaySeconds) =>
+        UpdateElement(id, element =>
         {
-            var index = elements.FindIndex(element => element.Id == id);
-            if (index < 0) return null;
-            var element = elements[index];
             var now = clock.GetUtcNow();
             var schedule = new DisplaySchedule(Guid.NewGuid(), now.AddSeconds(delaySeconds));
             var playback = element.Playback;
             if (playback?.StartedAt is not null)
                 playback = playback with { Offset = playback.PositionAt(now), StartedAt = schedule.At };
-            elements[index] = element with { Visible = true, DisplaySchedule = schedule, Playback = playback };
-            Publish();
-            return elements[index];
-        }
-    }
+            return element with { Visible = true, DisplaySchedule = schedule, Playback = playback };
+        });
 
-    public bool CancelDisplay(Guid id, Guid scheduleId)
-    {
-        lock (gate)
+    public bool CancelDisplay(Guid id, Guid scheduleId) =>
+        UpdateElement(id, element =>
         {
-            var index = elements.FindIndex(element => element.Id == id);
-            if (index < 0) return false;
-            var element = elements[index];
             var now = clock.GetUtcNow();
             if (element.DisplaySchedule?.Id != scheduleId ||
-                (element.Kind != "alarm" && element.DisplaySchedule.At <= now)) return false;
+                (element.Kind != "alarm" && element.DisplaySchedule.At <= now)) return null;
             var playback = element.Playback;
             if (playback is not null) playback = playback with { Offset = playback.PositionAt(now), StartedAt = null };
-            elements[index] = element with { Visible = false, DisplaySchedule = null, Playback = playback };
-            Publish();
-            return true;
-        }
-    }
+            return element with { Visible = false, DisplaySchedule = null, Playback = playback };
+        }) is not null;
 
-    public Element? ScheduleAlarm(Guid id, ScheduleAlarm request)
-    {
-        lock (gate)
+    public Element? ScheduleAlarm(Guid id, ScheduleAlarm request) =>
+        UpdateElement(id, element =>
         {
-            var index = elements.FindIndex(element => element.Id == id && element.Kind == "alarm");
-            if (index < 0 || request.At <= clock.GetUtcNow()) return null;
-            elements[index] = elements[index] with
+            if (request.At <= clock.GetUtcNow()) return null;
+            return element with
             {
                 Visible = true,
                 DisplaySchedule = new(Guid.NewGuid(), request.At.ToUniversalTime())
             };
+        }, kind: "alarm");
+
+    // Lookup, mutation and publication share one lock; rejected updates publish nothing.
+    private Element? UpdateElement(Guid id, Func<Element, Element?> update, string? kind = null)
+    {
+        lock (gate)
+        {
+            var index = elements.FindIndex(element => element.Id == id && (kind is null || element.Kind == kind));
+            if (index < 0) return null;
+            var updated = update(elements[index]);
+            if (updated is null) return null;
+            elements[index] = updated;
             Publish();
-            return elements[index];
+            return updated;
         }
     }
 

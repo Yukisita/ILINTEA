@@ -171,6 +171,106 @@ Run("Alarms reject past and current times and remain cancelable after starting",
     Assert(!board.Snapshot().Elements.Single().Visible, "Canceled alarm is still visible");
 });
 
+Run("Every successful element update publishes exactly one matching snapshot", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var text = board.Add("text")!;
+    var script = board.Add("script", text: "script")!;
+    var alarm = board.Add("alarm")!;
+    var image = board.Add("image", new("GIF89a"u8.ToArray(), "image/gif"))!;
+    var subscription = board.Subscribe();
+    subscription.Reader.TryRead(out _);
+    Check(() => board.Update(text.Id, Patch(text: "updated")));
+    Check(() => board.ReplaceImage(image.Id, new([255, 216, 255], "image/jpeg")));
+    Check(() => board.ControlScript(script.Id, new("play", null)));
+    var scheduled = Check(() => board.ScheduleDisplay(script.Id, 10));
+    Check(() => board.CancelDisplay(script.Id, scheduled.DisplaySchedule!.Id)
+        ? board.Snapshot().Elements.Single(element => element.Id == script.Id) : null);
+    Check(() => board.ScheduleAlarm(alarm.Id, new(clock.Now.AddMinutes(1))));
+    board.Unsubscribe(subscription.Id);
+
+    Element Check(Func<Element?> update)
+    {
+        var revision = board.Snapshot().Revision;
+        var updated = update();
+        Assert(updated is not null, "Update failed");
+        Assert(subscription.Reader.TryRead(out var snapshot), "Missing update event");
+        Equal(revision + 1, snapshot!.Revision);
+        Equal(updated, snapshot.Elements.Single(element => element.Id == updated!.Id));
+        Assert(!subscription.Reader.TryRead(out _), "Extra update event");
+        return updated!;
+    }
+});
+
+Run("Missing elements and wrong element kinds never change or publish board state", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var text = board.Add("text")!;
+    var before = board.Snapshot();
+    var subscription = board.Subscribe();
+    subscription.Reader.TryRead(out _);
+    var missing = Guid.NewGuid();
+    Equal<Element?>(null, board.Update(missing, Patch(text: "ignored")));
+    Equal<Element?>(null, board.ScheduleDisplay(missing, 10));
+    Assert(!board.CancelDisplay(missing, Guid.NewGuid()), "Missing element accepted cancellation");
+    Assert(!board.CancelDisplay(text.Id, Guid.NewGuid()), "Unscheduled element accepted cancellation");
+    foreach (var id in new[] { missing, text.Id })
+    {
+        Equal<Element?>(null, board.ReplaceImage(id, new("GIF89a"u8.ToArray(), "image/gif")));
+        Equal<Element?>(null, board.ControlScript(id, new("play", null)));
+        Equal<Element?>(null, board.ScheduleAlarm(id, new(clock.Now.AddMinutes(1))));
+        Equal<ImageData?>(null, board.GetImage(id));
+    }
+    var after = board.Snapshot();
+    Equal(before.Revision, after.Revision);
+    Assert(before.Elements.SequenceEqual(after.Elements), "Rejected update changed elements");
+    Assert(!subscription.Reader.TryRead(out _), "Rejected update published an event");
+    board.Unsubscribe(subscription.Id);
+});
+
+Run("Manual display and text changes preserve scheduled playback rules", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("script", text: "original")!.Id;
+    board.ControlScript(id, new("play", null));
+    clock.Now += TimeSpan.FromSeconds(2);
+    board.ScheduleDisplay(id, 10);
+    var shown = board.Update(id, Patch() with { Visible = true })!;
+    Equal<DisplaySchedule?>(null, shown.DisplaySchedule);
+    Equal<DateTimeOffset?>(clock.Now, shown.Playback!.StartedAt);
+    Equal(60, shown.Playback.Offset);
+    board.ScheduleDisplay(id, 10);
+    var hidden = board.Update(id, Patch() with { Visible = false })!;
+    Equal<DisplaySchedule?>(null, hidden.DisplaySchedule);
+    Equal<DateTimeOffset?>(null, hidden.Playback!.StartedAt);
+    Equal(60, hidden.Playback.Offset);
+    board.ControlScript(id, new("play", null));
+    var schedule = board.ScheduleDisplay(id, 10)!.DisplaySchedule;
+    var edited = board.Update(id, Patch(text: "replacement"))!;
+    Equal(schedule, edited.DisplaySchedule);
+    Equal(new ScriptPlayback(), edited.Playback);
+});
+
+Run("Concurrent image replacements retain every revision and the latest published snapshot", () =>
+{
+    var board = new BoardStore();
+    var id = board.Add("image", new("GIF89a"u8.ToArray(), "image/gif"))!.Id;
+    var subscription = board.Subscribe();
+    subscription.Reader.TryRead(out _);
+    Parallel.For(0, 100, index => board.ReplaceImage(id, new([255, 216, 255, (byte)index], "image/jpeg")));
+    var snapshot = board.Snapshot();
+    Equal(100L, snapshot.Elements.Single().ImageRevision);
+    Equal(101L, snapshot.Revision);
+    Equal("image/jpeg", board.GetImage(id)!.ContentType);
+    Assert(subscription.Reader.TryRead(out var published), "Missing latest image update");
+    Equal(snapshot.Revision, published!.Revision);
+    Equal(snapshot.Elements.Single(), published.Elements.Single());
+    board.Unsubscribe(subscription.Id);
+});
+
 passed += await BoardArchiveTests.RunAsync();
 Console.WriteLine($"{passed} tests passed.");
 
