@@ -196,7 +196,7 @@ function renderElement(node, element, editable, limits, layer) {
 }
 
 function render() {
-    renderSyncStatus();
+    renderConnectionStatus();
     resizeStage();
     if (!viewer) renderSettingsControls();
     if (!viewer) renderCanvasControls();
@@ -736,17 +736,15 @@ async function updateCanvas(patch) {
     finally { canvasSaving = false; render(); }
 }
 
-function renderSyncStatus() {
+function renderConnectionStatus() {
     $('connection').textContent = connected ? t('connection.connected') : t('connection.reconnecting');
     $('connection').className = `connection ${connected ? 'connected' : 'disconnected'}`;
-    $('save-status').textContent = !connected ? t('connection.checking')
-        : editSync.hasPending || editSync.sending ? t('save.pending') : t('save.applied');
 }
 
 function setConnection(value) {
     const changed = connected !== value;
     connected = value;
-    renderSyncStatus();
+    renderConnectionStatus();
     if (!viewer) {
         renderSettingsControls();
         renderCanvasControls();
