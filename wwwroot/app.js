@@ -1,6 +1,7 @@
 import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage } from '/i18n.js?v=20261010-language';
 import { createEditSync } from '/edit-sync.js?v=20261010-refactor-sync';
 import { bindFilePicker } from '/file-picker.js?v=20261013';
+import { connectBoardEvents } from '/board-connection.js?v=20261014';
 
 await initializeI18n();
 
@@ -754,20 +755,21 @@ function setConnection(value) {
     renderAlarm();
 }
 
-const events = new EventSource('/api/events');
-events.onopen = () => { state = { ...state, revision: -1 }; };
-events.onmessage = (event) => {
-    acceptState(JSON.parse(event.data));
-    setConnection(true);
-};
-events.onerror = () => {
-    setConnection(false);
-    if (editSync.hasPending) {
-        editSync.clearPending();
-        notify(t('connection.lostChanges'));
-        render();
+connectBoardEvents({
+    onOpen: () => { state = { ...state, revision: -1 }; },
+    onMessage: event => {
+        acceptState(JSON.parse(event.data));
+        setConnection(true);
+    },
+    onDisconnect: () => {
+        setConnection(false);
+        if (editSync.hasPending) {
+            editSync.clearPending();
+            notify(t('connection.lostChanges'));
+            render();
+        }
     }
-};
+});
 
 async function uploadImage(file, id = null) {
     if (!file || !connected || settingsBusy || imageBusy) return;
