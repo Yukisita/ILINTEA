@@ -1,5 +1,5 @@
 import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage } from '/i18n.js?v=20261010-language';
-import { createEditSync } from '/edit-sync.js?v=20261010-refactor-sync';
+import { createEditSync } from '/edit-sync.js?v=20261014-await-edits';
 import { bindFilePicker } from '/file-picker.js?v=20261013';
 import { connectBoardEvents } from '/board-connection.js?v=20261014';
 
@@ -100,7 +100,7 @@ function selectedElement() {
 }
 
 function elementActionBusy(id) {
-    return !connected || settingsBusy || canvasSaving || scriptBusy || gesture?.id === id || editSync.hasChanges(id);
+    return !connected || settingsBusy || canvasSaving || scriptBusy || gesture?.id === id;
 }
 
 function displayActionBusy(id) {
@@ -108,7 +108,11 @@ function displayActionBusy(id) {
 }
 
 function canvasActionBusy() {
-    return !connected || settingsBusy || canvasSaving || editSync.sending || editSync.hasPending || !!gesture;
+    return !connected || settingsBusy || canvasSaving || !!gesture;
+}
+
+async function flushEdits() {
+    return await editSync.flush() && connected;
 }
 
 function orderActionBusy() {
@@ -440,6 +444,7 @@ async function scheduleDisplay(cancel = false) {
     displayBusy = true;
     renderDisplayControls();
     try {
+        if (!await flushEdits()) return;
         const path = `/api/elements/${element.id}/display-schedule`;
         if (cancel) await request(`${path}/${element.displaySchedule.id}`, { method: 'DELETE' });
         else await requestJson(path, 'POST', { delaySeconds: seconds });
@@ -459,6 +464,7 @@ async function scheduleAlarm() {
     displayBusy = true;
     renderDisplayControls();
     try {
+        if (!await flushEdits()) return;
         await requestJson(`/api/elements/${element.id}/alarm`, 'PUT', { at: date.toISOString() });
         alarmFormDirty = false;
         await refreshBoard();
@@ -516,6 +522,7 @@ async function controlScript(action, speed) {
     scriptBusy = true;
     renderScriptControls();
     try {
+        if (!await flushEdits()) return;
         await requestJson(`/api/elements/${element.id}/playback`, 'POST', { action, speed });
         await refreshBoard();
     } catch (error) { notify(error.message); }
@@ -688,6 +695,7 @@ async function downloadSettings() {
     settingsBusy = true;
     render();
     try {
+        if (!await flushEdits()) return;
         const response = await requestResponse('/api/settings/download');
         const url = URL.createObjectURL(await response.blob());
         const link = document.createElement('a');
@@ -706,6 +714,7 @@ async function uploadSettings(file) {
     settingsBusy = true;
     render();
     try {
+        if (!await flushEdits()) return;
         const snapshot = await request('/api/settings/upload', {
             method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file
         });
@@ -731,6 +740,7 @@ async function updateCanvas(patch) {
     canvasSaving = true;
     render();
     try {
+        if (!await flushEdits()) return;
         await requestJson('/api/canvas', 'PATCH', patch);
         await refreshBoard();
     } catch (error) { notify(error.message); }
@@ -806,6 +816,7 @@ async function loadScriptFile(file, id = null) {
         catch { throw new Error(t('errors.scriptEncoding')); }
         text = text.replace(/\r\n?/g, '\n');
         if (!text.trim()) throw new Error(t('errors.scriptEmpty'));
+        if (id && !await flushEdits()) return;
         const element = await requestJson(id ? `/api/elements/${id}` : '/api/elements',
             id ? 'PATCH' : 'POST', id ? { text } : { kind: 'script', text });
         await refreshBoard();
@@ -885,6 +896,7 @@ if (!viewer) {
         renderDisplayControls();
         editSync.discard(id);
         try {
+            if (!await flushEdits()) return;
             await request(`/api/elements/${id}`, { method: 'DELETE' });
             await refreshBoard();
         } catch (error) { notify(error.message); }
