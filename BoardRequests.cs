@@ -10,7 +10,7 @@ public record ScriptControl(string Action, double? Speed)
 
 public record ScheduleDisplay(int DelaySeconds);
 public record ScheduleAlarm(DateTimeOffset At);
-public record CreateElement(string Kind, string? Text = null);
+public record CreateElement(string Kind, string? Text = null, string? CountdownText = null);
 public record MoveElement(int Offset);
 
 public record CanvasPatch(string? AspectRatio, string? BackgroundColor)
@@ -20,11 +20,12 @@ public record CanvasPatch(string? AspectRatio, string? BackgroundColor)
 }
 
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
-    int? FontSize, string? Color, string? Align, bool? Visible, bool? ShowCountdown = null)
+    int? FontSize, string? Color, string? Align, bool? Visible, string? CountdownText = null)
 {
     public bool IsValid() =>
         new[] { X, Y, Width, Height }.All(value => value is null || double.IsFinite(value.Value)) &&
         (Text is null || UploadLimits.TextFits(Text)) &&
+        (CountdownText is null || UploadLimits.TextFits(CountdownText)) &&
         (FontSize is null or >= 12 and <= 160) &&
         PatchValidation.IsColorValid(Color) &&
         (Align is null or "left" or "center" or "right");

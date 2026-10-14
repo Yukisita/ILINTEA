@@ -94,7 +94,10 @@ app.MapPost("/api/elements", (CreateElement request, BoardStore board) =>
         return Results.BadRequest(I18n.Error("errors.elementKind"));
     if (request.Kind == "script" && (string.IsNullOrWhiteSpace(request.Text) || !UploadLimits.TextFits(request.Text)))
         return Results.BadRequest(I18n.Error("errors.scriptContent"));
-    var element = board.Add(request.Kind, text: request.Text);
+    if ((request.Text is not null && !UploadLimits.TextFits(request.Text)) ||
+        (request.CountdownText is not null && !UploadLimits.TextFits(request.CountdownText)))
+        return Results.BadRequest(I18n.Error("errors.settings"));
+    var element = board.Add(request.Kind, text: request.Text, countdownText: request.CountdownText);
     return element is null ? Results.BadRequest(I18n.Error("errors.elementLimit")) : Results.Ok(element);
 });
 

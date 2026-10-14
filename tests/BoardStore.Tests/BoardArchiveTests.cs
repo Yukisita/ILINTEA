@@ -24,8 +24,7 @@ internal static class BoardArchiveTests
             source.ControlScript(script.Id, new("speed", 75));
             source.ControlScript(script.Id, new("play", null));
             source.ScheduleDisplay(script.Id, 10);
-            var alarm = source.Add("alarm", text: "alarm message")!;
-            source.Update(alarm.Id, new(null, null, null, null, null, null, null, null, null, true));
+            var alarm = source.Add("alarm", text: "終了 🌟", countdownText: "カウント中\nremaining")!;
             source.ScheduleAlarm(alarm.Id, new(clock.Now.AddSeconds(1)));
             clock.Now += TimeSpan.FromSeconds(2);
             var original = source.Snapshot();
@@ -47,7 +46,7 @@ internal static class BoardArchiveTests
                 Equal(expected with
                 {
                     Id = actual.Id, ImageRevision = 0, DisplaySchedule = null,
-                    Visible = expected.Kind == "script" ? false : expected.Visible,
+                    Visible = expected.Kind is "script" or "alarm" ? false : expected.Visible,
                     Playback = expected.Kind == "script" ? new(Speed: 75) : null
                 }, actual);
                 if (expected.Kind == "image")
@@ -64,10 +63,10 @@ internal static class BoardArchiveTests
             target.Unsubscribe(subscription.Id);
         });
 
-        // A fixed v1 fixture protects defaults independently of today's exporter.
-        const string version1 = """
+        // A fixed fixture protects the current contract independently of the exporter.
+        const string version2 = """
             {
-              "format": "StreamPrompter", "version": 1,
+              "format": "StreamPrompter", "version": 2,
               "canvas": {},
               "elements": [{
                 "id": "8e271f90-573e-470e-b3c2-e43dfe39cacf", "kind": "text",
@@ -75,10 +74,10 @@ internal static class BoardArchiveTests
               }]
             }
             """;
-        await Run("Version 1 files retain defaults for omitted optional fields", async () =>
+        await Run("Current settings files use defaults for omitted optional fields", async () =>
         {
             var target = new BoardStore();
-            using var archive = new MemoryStream(CreateArchive(version1));
+            using var archive = new MemoryStream(CreateArchive(version2));
             var restored = await BoardArchive.RestoreAsync(archive, target);
             Equal(new CanvasSettings(), restored.Canvas);
             var element = restored.Elements.Single();
@@ -86,23 +85,53 @@ internal static class BoardArchiveTests
             Equal(64, element.FontSize);
             Equal("#ffffff", element.Color);
             Equal("left", element.Align);
-            Assert(!element.Visible && !element.ShowCountdown, "Optional flags lost their defaults");
+            Assert(!element.Visible && element.CountdownText == "", "Optional fields lost their defaults");
         });
 
-        await Run("Compatible extra JSON fields and archive entries are ignored", async () =>
+        await Run("Extra JSON fields and archive entries are ignored", async () =>
         {
-            var json = JsonNode.Parse(version1)!.AsObject();
+            var json = JsonNode.Parse(version2)!.AsObject();
             json["futureSetting"] = new JsonObject { ["enabled"] = true };
             json["elements"]![0]!["futureElementSetting"] = "value";
             using var archive = new MemoryStream(CreateArchive(json.ToJsonString(), "../unused.txt", "ignored"u8.ToArray()));
             Equal(1, (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Length);
         });
 
+        await Run("Saving a counting alarm preserves both messages without changing the live alarm", async () =>
+        {
+            var clock = new ManualTimeProvider();
+            var source = new BoardStore(clock);
+            var id = source.Add("alarm", text: "finished", countdownText: "counting")!.Id;
+            source.ScheduleAlarm(id, new(clock.Now.AddMinutes(1)));
+            var original = source.Snapshot();
+            using var archive = new MemoryStream(await SaveAsync(source));
+            var restored = (await BoardArchive.RestoreAsync(archive, new BoardStore(clock))).Elements.Single();
+            Assert(!restored.Visible && restored.DisplaySchedule is null, "Restored alarm is armed");
+            Equal("counting", restored.CountdownText);
+            Equal("finished", restored.Text);
+            Equal(original.Revision, source.Snapshot().Revision);
+            Equal(original.Elements.Single(), source.Snapshot().Elements.Single());
+        });
+
+        await Run("Restoring even a visible alarm in the manifest leaves it disarmed", async () =>
+        {
+            var json = JsonNode.Parse(version2)!.AsObject();
+            json["elements"]![0]!["kind"] = "alarm";
+            json["elements"]![0]!["visible"] = true;
+            json["elements"]![0]!["text"] = "finished";
+            json["elements"]![0]!["countdownText"] = "counting";
+            using var archive = new MemoryStream(CreateArchive(json.ToJsonString()));
+            var element = (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Single();
+            Assert(!element.Visible && element.DisplaySchedule is null, "Restored alarm is enabled");
+            Equal("finished", element.Text);
+            Equal("counting", element.CountdownText);
+        });
+
         await Run("Unsupported versions are rejected without changing the board", async () =>
         {
-            foreach (var version in new[] { 0, 2, int.MaxValue })
+            foreach (var version in new[] { 0, 1, 3, int.MaxValue })
             {
-                var json = JsonNode.Parse(version1)!.AsObject();
+                var json = JsonNode.Parse(version2)!.AsObject();
                 json["version"] = version;
                 await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileVersion");
             }
@@ -122,6 +151,7 @@ internal static class BoardArchiveTests
                 json => json["elements"]![0] = null,
                 json => json["elements"]![0]!["kind"] = "unknown",
                 json => json["elements"]![0]!["text"] = null,
+                json => json["elements"]![0]!["countdownText"] = null,
                 json => json["elements"]![0]!["width"] = -1,
                 json => json["elements"]![0]!["x"] = 9000,
                 json => json["elements"]![0]!["color"] = "#123456\n",
@@ -130,7 +160,7 @@ internal static class BoardArchiveTests
             ];
             foreach (var corrupt in corruptions)
             {
-                var json = JsonNode.Parse(version1)!.AsObject();
+                var json = JsonNode.Parse(version2)!.AsObject();
                 corrupt(json);
                 await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileFormat");
             }
@@ -138,7 +168,7 @@ internal static class BoardArchiveTests
 
         await Run("Missing and corrupt image entries are rejected before replacing any settings", async () =>
         {
-            var json = JsonNode.Parse(version1)!.AsObject();
+            var json = JsonNode.Parse(version2)!.AsObject();
             json["elements"]![0]!["kind"] = "image";
             await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileFormat");
             var name = "images/8e271f90573e470eb3c2e43dfe39cacf";
@@ -151,7 +181,7 @@ internal static class BoardArchiveTests
             await RejectUnchangedAsync("not a zip"u8.ToArray(), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive("{"), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive("null"), "errors.settingsFileFormat");
-            await RejectUnchangedAsync(CreateArchive(version1, "settings.json", Encoding.UTF8.GetBytes(version1)), "errors.settingsFileFormat");
+            await RejectUnchangedAsync(CreateArchive(version2, "settings.json", Encoding.UTF8.GetBytes(version2)), "errors.settingsFileFormat");
         });
 
         await Run("Empty boards can be saved and restored", async () =>
@@ -169,7 +199,7 @@ internal static class BoardArchiveTests
             var target = new BoardStore(new ManualTimeProvider());
             target.Add("text");
             var before = target.Snapshot();
-            using var archive = new MemoryStream(CreateArchive(version1));
+            using var archive = new MemoryStream(CreateArchive(version2));
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
             try

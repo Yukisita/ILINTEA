@@ -2,6 +2,7 @@ import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage
 import { createEditSync } from '/edit-sync.js?v=20261014-await-edits';
 import { bindFilePicker } from '/file-picker.js?v=20261013';
 import { connectBoardEvents } from '/board-connection.js?v=20261014';
+import { getAlarmState } from '/alarm-state.js?v=20261014';
 
 await initializeI18n();
 
@@ -46,7 +47,7 @@ const scriptLimits = new Map();
 const programScriptLimits = new Map();
 const kinds = { text: 'kind.text', clock: 'kind.clock', image: 'kind.image', script: 'kind.script', alarm: 'kind.alarm' };
 const maxFileBytes = 1024 ** 3;
-const fields = { text: 'text', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height' };
+const fields = { text: 'text', 'countdown-text': 'countdownText', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height' };
 let flipX = false;
 let flipY = false;
 try {
@@ -86,7 +87,7 @@ async function requestResponse(path, options = {}) {
 function effectiveElement(element) {
     const patch = editSync.patchFor(element.id);
     const result = { ...element, ...patch };
-    if (typeof patch.visible === 'boolean') result.displaySchedule = null;
+    if (patch.visible === false || (patch.visible === true && element.kind !== 'alarm')) result.displaySchedule = null;
     result.width = Math.max(80, Math.min(canvasWidth(), result.width));
     result.height = Math.max(48, Math.min(canvasHeight(), result.height));
     result.x = Math.max(0, Math.min(canvasWidth() - result.width, result.x));
@@ -146,6 +147,14 @@ function createElementNode(element, editable) {
         const script = document.createElement('div');
         script.className = 'script-text';
         content.append(script);
+    }
+    if (element.kind === 'alarm') {
+        const timer = document.createElement('div');
+        timer.className = 'alarm-remaining';
+        timer.setAttribute('role', 'timer');
+        const message = document.createElement('div');
+        message.className = 'alarm-message';
+        content.append(timer, message);
     }
     if (element.kind === 'image') {
         const image = document.createElement('img');
@@ -259,7 +268,9 @@ function renderList() {
         label.textContent = ['text', 'script', 'alarm'].includes(element.kind)
             ? t('elements.rowWithText', { kind: t(kinds[element.kind]), text: element.text.split('\n')[0] || t('elements.emptyText') }) : t(kinds[element.kind]);
         const visibility = document.createElement('small');
-        visibility.textContent = displayIsWaiting(element) ? t('state.scheduled') : elementIsVisible(element) ? t('state.visible') : t('state.hidden');
+        const alarmPhase = element.kind === 'alarm' ? getAlarmState(element, Date.now() + serverOffset).phase : null;
+        visibility.textContent = t(alarmPhase === 'counting' ? 'state.countdown' : alarmPhase === 'finished' ? 'state.finished'
+            : displayIsWaiting(element) ? 'state.scheduled' : elementIsVisible(element) ? 'state.visible' : 'state.hidden');
         button.append(label, visibility);
         button.addEventListener('click', () => select(element.id));
         row.append(button);
@@ -305,7 +316,8 @@ function renderProperties() {
     $('width').max = canvasWidth();
     $('height').max = canvasHeight();
     $('text-fields').hidden = !['text', 'script', 'alarm'].includes(element.kind);
-    $('text-label').textContent = element.kind === 'alarm' ? t('alarm.message') : t('properties.text');
+    $('alarm-message-fields').hidden = element.kind !== 'alarm';
+    $('text-label').textContent = element.kind === 'alarm' ? t('alarm.finishedMessage') : t('properties.text');
     if (element.kind === 'script') $('text').removeAttribute('maxlength');
     else $('text').maxLength = 4000;
     $('script-fields').hidden = element.kind !== 'script';
@@ -316,35 +328,31 @@ function renderProperties() {
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);
         if (document.activeElement === input) continue;
-        input.value = element[property];
+        input.value = element[property] ?? '';
     }
     renderScriptControls();
     renderDisplayControls();
 }
 
 function displayIsWaiting(element) {
-    return !!element.displaySchedule && Date.parse(element.displaySchedule.at) > Date.now() + serverOffset;
+    return element.visible && !!element.displaySchedule && Date.parse(element.displaySchedule.at) > Date.now() + serverOffset;
 }
 
 function elementIsVisible(element) {
-    return element.visible && (!displayIsWaiting(element) || (element.kind === 'alarm' && element.showCountdown));
-}
-
-function remainingTime(element) {
-    const seconds = Math.max(0, Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000));
-    const pad = value => String(value).padStart(2, '0');
-    return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`;
+    return element.visible && (element.kind === 'alarm' || !displayIsWaiting(element));
 }
 
 function renderAlarmElement(node, element, editable) {
-    const counting = displayIsWaiting(element) && element.showCountdown;
+    const alarm = getAlarmState(element, Date.now() + serverOffset);
     const content = node.firstElementChild;
-    const label = counting ? t('alarm.countdownLabel') : t('kind.alarm');
-    if (content.dataset.alarmLabel !== label) content.dataset.alarmLabel = label;
-    const message = counting ? remainingTime(element) : element.text;
-    if (content.textContent !== message) content.textContent = message;
-    node.classList.toggle('counting-down', counting);
-    if (!editable) node.setAttribute('role', counting ? 'timer' : 'alert');
+    if (content.firstElementChild.textContent !== alarm.remaining) content.firstElementChild.textContent = alarm.remaining;
+    const message = content.lastElementChild;
+    if (message.textContent !== alarm.message) message.textContent = alarm.message;
+    if (!editable) {
+        if (alarm.phase === 'finished') message.setAttribute('role', 'alert');
+        else message.removeAttribute('role');
+    }
+    node.dataset.alarmPhase = alarm.phase;
 }
 
 function updateScheduledVisibility() {
@@ -354,9 +362,9 @@ function updateScheduledVisibility() {
         const node = nodes.get(element.id);
         if (!node) continue;
         if (element.kind === 'alarm') {
-            const wasCounting = node.classList.contains('counting-down');
+            const previousPhase = node.dataset.alarmPhase;
             renderAlarmElement(node, element, !viewer);
-            if (wasCounting !== node.classList.contains('counting-down')) changed = true;
+            if (previousPhase !== node.dataset.alarmPhase) changed = true;
             if (!viewer && programNodes.has(element.id)) renderAlarmElement(programNodes.get(element.id), original, false);
         }
         const offAir = !elementIsVisible(element);
@@ -386,11 +394,9 @@ function renderDisplayControls() {
     const busy = displayActionBusy(element.id);
     $('display-schedule-fields').hidden = alarm;
     $('alarm-settings').hidden = !alarm;
-    $('alarm-at').disabled = busy || visible;
-    $('schedule-alarm').disabled = busy || visible;
-    $('alarm-countdown').disabled = busy;
-    if (document.activeElement !== $('alarm-countdown')) $('alarm-countdown').value = String(!!element.showCountdown);
-    $('schedule-alarm').textContent = waiting ? t('alarm.changeSchedule') : t('alarm.schedule');
+    $('alarm-at').disabled = busy;
+    $('schedule-alarm').disabled = busy;
+    $('schedule-alarm').hidden = !onProgram;
     if (alarm) {
         const alarmKey = `${element.id}/${element.displaySchedule?.id ?? ''}`;
         if (shownAlarmId !== alarmKey && !alarmFormDirty) {
@@ -407,19 +413,20 @@ function renderDisplayControls() {
     $('confirm-delete').disabled = busy;
     $('delete-element').hidden = deleteConfirmId === element.id;
     $('delete-confirmation').hidden = deleteConfirmId !== element.id;
-    $('cancel-display').hidden = !waiting;
-    $('toggle-visibility').textContent = onProgram
+    $('cancel-display').hidden = alarm || !waiting;
+    $('toggle-visibility').textContent = alarm
+        ? t(onProgram ? 'display.hide' : 'alarm.start')
+        : onProgram
         ? t(waiting ? 'display.hideCancelSchedule' : 'display.hide')
         : t(waiting ? 'display.showCancelSchedule' : 'display.show');
     $('schedule-display').textContent = waiting ? t('display.changeSchedule') : t('display.schedule');
-    const status = t(waiting ? alarm && element.showCountdown ? 'state.countdown' : 'state.scheduled'
-        : visible ? 'state.visible' : 'state.hidden');
+    const phase = alarm ? getAlarmState(element, Date.now() + serverOffset).phase : null;
+    const status = t(alarm && phase !== 'inactive' ? phase === 'counting' ? 'state.countdown' : 'state.finished'
+        : waiting ? 'state.scheduled' : visible ? 'state.visible' : 'state.hidden');
     if ($('display-state').textContent !== status) $('display-state').textContent = status;
     $('display-state').className = `display-state ${waiting ? 'waiting' : visible ? 'visible' : ''}`;
-    $('display-status').textContent = alarm
-        ? waiting ? t('alarm.waiting', { remaining: remainingTime(element), date: alarmFormatter.format(new Date(element.displaySchedule.at)) })
-            : visible ? t('alarm.hideBeforeSchedule') : t('alarm.hiddenUntilSchedule')
-        : waiting
+    $('display-status').hidden = alarm;
+    $('display-status').textContent = alarm ? '' : waiting
         ? t('display.waiting', { seconds: Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000) })
         : visible ? t('display.hideBeforeSchedule') : t('display.hiddenUntilSchedule');
 }
@@ -427,6 +434,10 @@ function renderDisplayControls() {
 function toggleElementVisibility() {
     const element = selectedElement();
     if (!element || displayActionBusy(element.id)) return;
+    if (element.kind === 'alarm' && !element.visible) {
+        void scheduleAlarm();
+        return;
+    }
     queuePatch(element.id, { visible: !elementIsVisible(element) });
     void editSync.flush();
 }
@@ -455,7 +466,7 @@ async function scheduleDisplay(cancel = false) {
 
 async function scheduleAlarm() {
     const element = selectedElement();
-    if (element?.kind !== 'alarm' || displayActionBusy(element.id) || (element.visible && !displayIsWaiting(element))) return;
+    if (element?.kind !== 'alarm' || displayActionBusy(element.id)) return;
     const date = new Date($('alarm-at').value);
     if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
         notify(t('errors.alarmFuture'));
@@ -601,9 +612,6 @@ function resizeStage() {
 }
 
 let clockFormatter = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-let alarmFormatter = new Intl.DateTimeFormat(locale, {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
-});
 function updateClocks() {
     const time = clockFormatter.format(new Date(Date.now() + serverOffset));
     for (const element of state.elements) {
@@ -626,8 +634,9 @@ function localDateTimeValue(date) {
 
 function renderAlarm() {
     const alarms = state.elements.filter((element) => element.kind === 'alarm');
-    const active = alarms.filter(element => elementIsVisible(element) && !displayIsWaiting(element));
-    const waiting = alarms.filter(displayIsWaiting);
+    const now = Date.now() + serverOffset;
+    const active = alarms.filter(element => getAlarmState(element, now).phase === 'finished');
+    const waiting = alarms.filter(element => getAlarmState(element, now).phase === 'counting');
     $('viewer-alarm-status').textContent = active.length ? t('viewer.alarmActive', { count: active.length })
         : waiting.length ? t('viewer.alarmWaiting', { count: waiting.length }) : '';
     $('stop-alarm').hidden = active.length === 0;
@@ -637,16 +646,15 @@ function renderAlarm() {
 
 async function clearAlarm() {
     if (!connected || alarmSaving) return;
-    const alarms = state.elements.filter((element) => element.kind === 'alarm' && elementIsVisible(element) && !displayIsWaiting(element));
+    const now = Date.now() + serverOffset;
+    const alarms = state.elements.filter(element => element.kind === 'alarm' && getAlarmState(element, now).phase === 'finished');
     if (!alarms.length) return;
     alarmSaving = true;
     renderAlarm();
     try {
         for (const element of alarms) {
             // The schedule ID prevents an old stop action from cancelling a newer reservation.
-            if (element.displaySchedule)
-                await request(`/api/elements/${element.id}/display-schedule/${element.displaySchedule.id}`, { method: 'DELETE' });
-            else await requestJson(`/api/elements/${element.id}`, 'PATCH', { visible: false });
+            await request(`/api/elements/${element.id}/display-schedule/${element.displaySchedule.id}`, { method: 'DELETE' });
         }
         await refreshBoard();
     } catch (error) { notify(error.message); }
@@ -659,7 +667,7 @@ async function addElement(kind) {
     renderSettingsControls();
     try {
         const element = await requestJson('/api/elements', 'POST', {
-            kind, ...(kind === 'alarm' ? { text: t('alarm.defaultMessage') } : {})
+            kind, ...(kind === 'alarm' ? { text: t('alarm.defaultMessage'), countdownText: t('alarm.defaultCountdownMessage') } : {})
         });
         // The next event supplies the shared state; fetch also covers a delayed event connection.
         await refreshBoard();
@@ -850,10 +858,6 @@ if (!viewer) {
     $('script-speed').addEventListener('input', () => { $('script-speed-value').textContent = t('script.speedValue', { speed: $('script-speed').value }); });
     $('script-speed').addEventListener('change', () => controlScript('speed', Number($('script-speed').value)));
     $('alarm-at').addEventListener('input', () => { alarmFormDirty = true; });
-    $('alarm-countdown').addEventListener('change', () => {
-        const element = selectedElement();
-        if (element?.kind === 'alarm') queuePatch(element.id, { showCountdown: $('alarm-countdown').value === 'true' });
-    });
     $('schedule-alarm').addEventListener('click', scheduleAlarm);
     $('add-clock').addEventListener('click', () => addElement('clock'));
     $('add-text').addEventListener('click', () => addElement('text'));
@@ -931,9 +935,6 @@ $('language').addEventListener('change', async (event) => {
         document.title = t('page.title', { mode: t(viewer ? 'navigation.view' : 'navigation.edit') });
         if (viewer) document.querySelector('.preview-monitor').setAttribute('aria-label', t('monitor.viewerLabel'));
         clockFormatter = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-        alarmFormatter = new Intl.DateTimeFormat(locale, {
-            month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
-        });
         render();
     } catch { notify(t('errors.language')); }
     finally { select.value = locale; select.disabled = false; }

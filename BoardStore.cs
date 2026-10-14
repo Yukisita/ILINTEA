@@ -26,7 +26,8 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
             var now = clock.GetUtcNow();
             return new(canvas, elements.Select(element => element with
             {
-                Visible = element.Visible && (element.DisplaySchedule is null || element.DisplaySchedule.At <= now),
+                Visible = element.Kind != "alarm" && element.Visible &&
+                    (element.DisplaySchedule is null || element.DisplaySchedule.At <= now),
                 DisplaySchedule = null
             }).ToArray(), new(images));
         }
@@ -73,7 +74,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
         }
     }
 
-    public Element? Add(string kind, ImageData? image = null, string? text = null)
+    public Element? Add(string kind, ImageData? image = null, string? text = null, string? countdownText = null)
     {
         lock (gate)
         {
@@ -83,7 +84,9 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 "clock" => new Element(Guid.NewGuid(), kind, 880, 24, 368, 88, Align: "right"),
                 "image" => new Element(Guid.NewGuid(), kind, 80, 440, 240, 180),
                 "script" => new Element(Guid.NewGuid(), kind, 80, 140, 1120, 420, text ?? "", 48, Playback: new()),
-                "alarm" => new Element(Guid.NewGuid(), kind, 80, 520, 960, 160, text ?? I18n.Text("alarm.defaultMessage"), 40, "#332701"),
+                "alarm" => new Element(Guid.NewGuid(), kind, 80, 520, 960, 160,
+                    text ?? I18n.Text("alarm.defaultMessage"), 40, "#332701",
+                    CountdownText: countdownText ?? I18n.Text("alarm.defaultCountdownMessage")),
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "", 56)
             }) with { Visible = false };
             element = ScaleElement(element, canvas.Width / 1280, canvas.Height / 720);
@@ -114,9 +117,11 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 Color = patch.Color ?? current.Color,
                 Align = patch.Align ?? current.Align,
                 Visible = patch.Visible ?? current.Visible,
-                ShowCountdown = patch.ShowCountdown ?? current.ShowCountdown,
+                CountdownText = patch.CountdownText ?? current.CountdownText,
                 Playback = playback,
-                DisplaySchedule = patch.Visible is not null ? null : current.DisplaySchedule
+                // Showing an alarm must retain its deadline; hiding it disarms it immediately.
+                DisplaySchedule = patch.Visible is false || (patch.Visible is true && current.Kind != "alarm")
+                    ? null : current.DisplaySchedule
             });
         });
 
