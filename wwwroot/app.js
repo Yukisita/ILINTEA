@@ -131,6 +131,7 @@ function select(id) {
         deleteConfirmId = null;
         alarmFormDirty = false;
         shownAlarmId = null;
+        document.querySelector('.property-editor').scrollTop = 0;
     }
     if (id !== selectedId && $('property-fields').contains(document.activeElement)) document.activeElement.blur();
     selectedId = id;
