@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261014-alarm">
+  <link rel="stylesheet" href="/app.css?v=20261016-alarm-settings">
   <script type="module" src="/app.js?v=20261014-alarm"></script>
 </head>
 <body>
@@ -59,6 +59,11 @@
           <div id="script-file-fields" class="file-controls" hidden><button id="replace-script" type="button" data-i18n="script.replace"></button><input id="replacement-script-file" type="file" accept=".txt,text/plain" hidden></div>
           <div id="alarm-message-fields" hidden><label for="countdown-text" data-i18n="alarm.countdownMessage"></label><textarea id="countdown-text" rows="3" maxlength="4000"></textarea></div>
           <div id="text-fields"><label id="text-label" for="text" data-i18n="properties.text"></label><textarea id="text" rows="5" maxlength="4000"></textarea></div>
+          <div id="alarm-settings" hidden>
+            <label for="alarm-at"><span data-i18n="alarm.at"></span> <span class="muted" data-i18n="alarm.silent"></span></label>
+            <input id="alarm-at" type="datetime-local" step="1" required>
+            <button id="schedule-alarm" type="button" hidden data-i18n="alarm.changeSchedule"></button>
+          </div>
           <div id="script-fields" hidden>
             <label for="script-speed"><span data-i18n="script.speed"></span> <output id="script-speed-value"></output></label>
             <input id="script-speed" type="range" min="5" max="200" step="5" value="30">
@@ -77,11 +82,6 @@
           </div>
           <section class="display-panel" aria-labelledby="display-heading">
             <div class="display-heading"><h3 id="display-heading" data-i18n="display.title"></h3><span id="display-state" class="display-state" role="status"></span></div>
-            <div id="alarm-settings" class="display-schedule" hidden>
-              <label for="alarm-at"><span data-i18n="alarm.at"></span> <span class="muted" data-i18n="alarm.silent"></span></label>
-              <input id="alarm-at" type="datetime-local" step="1" required>
-              <button id="schedule-alarm" type="button" hidden data-i18n="alarm.changeSchedule"></button>
-            </div>
             <div class="visibility-actions"><button id="toggle-visibility" class="primary" type="button" aria-describedby="display-state" data-i18n="display.show"></button></div>
             <div id="display-schedule-fields" class="display-schedule">
               <label for="display-delay" data-i18n="display.delayLabel"></label>

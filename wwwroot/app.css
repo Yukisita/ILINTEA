@@ -77,6 +77,7 @@ button.primary:hover:not(:disabled) { background: #0b5ed7; }
 .element-alarm .element-content { display: flex; flex-direction: column; gap: 6px; }
 .alarm-remaining { flex: none; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.1; }
 .alarm-message { overflow: hidden; }
+#alarm-settings { margin-bottom: 14px; }
 #alarm-settings label { display: flex; align-items: center; justify-content: space-between; }
 #alarm-at { margin-top: 6px; }
 #schedule-alarm { margin-top: 8px; font-size: 13px; }
