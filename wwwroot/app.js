@@ -674,9 +674,7 @@ async function addElement(kind) {
     addBusy = true;
     renderSettingsControls();
     try {
-        const element = await requestJson('/api/elements', 'POST', {
-            kind, ...(kind === 'alarm' ? { text: t('alarm.defaultMessage'), countdownText: t('alarm.defaultCountdownMessage') } : {})
-        });
+        const element = await requestJson('/api/elements', 'POST', { kind });
         // The next event supplies the shared state; fetch also covers a delayed event connection.
         await refreshBoard();
         select(element.id);

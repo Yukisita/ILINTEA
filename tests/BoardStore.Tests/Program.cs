@@ -260,11 +260,13 @@ Run("Alarms reject past and current times and remain cancelable after starting",
     Assert(!board.Snapshot().Elements.Single().Visible, "Canceled alarm is still visible");
 });
 
-Run("Alarm message edits and repeated show patches retain the running deadline", () =>
+Run("Alarm messages default to blank and edits and repeated show patches retain the running deadline", () =>
 {
     var clock = new ManualTimeProvider();
     var board = new BoardStore(clock);
-    var alarm = board.Add("alarm", text: "finished", countdownText: "counting")!;
+    var alarm = board.Add("alarm")!;
+    Equal("", alarm.Text);
+    Equal("", alarm.CountdownText);
     Assert(!alarm.Visible && alarm.AlarmSchedule is null, "New alarm is enabled");
     var schedule = board.ScheduleAlarm(alarm.Id, new(clock.Now.AddMinutes(1)))!.AlarmSchedule;
     var edited = board.Update(alarm.Id, Patch(text: "終了") with { CountdownText = "カウント中" })!;

@@ -96,8 +96,6 @@
   "alarm.silent": "Silent",
   "alarm.start": "Show and start",
   "alarm.changeSchedule": "Change end time",
-  "alarm.defaultCountdownMessage": "Time remaining",
-  "alarm.defaultMessage": "The scheduled time has arrived",
   "script.speed": "Scroll speed",
   "script.replace": "Replace TXT file",
   "script.speedValue": "{speed} px/s",
