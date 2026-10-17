@@ -1,6 +1,11 @@
 {
   "app.name": "StreamPrompter",
   "app.brand": "▣ StreamPrompter",
+  "about.title": "About",
+  "about.name": "StreamPrompter (working title)",
+  "about.description": "A browser-based prompter for production staff and presenters to share scripts, clocks, images and alarms during streams and recordings.",
+  "about.status": "An early proof of concept (PoC). The app name and features may change.",
+  "about.close": "Close",
   "page.title": "{mode} - StreamPrompter",
   "navigation.label": "Switch view",
   "navigation.edit": "Edit",

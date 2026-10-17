@@ -60,6 +60,15 @@ button:disabled { opacity: .45; cursor: default; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .navbar { background: var(--accent); color: #fff; padding: 15px 24px; display: flex; justify-content: center; align-items: center; }
 .brand { color: #fff; text-decoration: none; font-size: 23px; font-weight: 700; }
+.about-dialog { width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); box-shadow: 0 16px 48px #0003; }
+.about-dialog::backdrop { background: #17223680; }
+.about-heading { padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--page); }
+.about-content { padding: 24px; font-size: 14px; line-height: 1.7; }
+.about-name { margin: 0 0 12px; font-size: 22px; font-weight: 700; }
+#about-description { margin: 0 0 16px; }
+.about-note { margin: 0; padding: 12px; border-radius: var(--control-radius); background: var(--page); color: var(--muted); font-size: 13px; }
+.about-actions { display: flex; justify-content: end; margin: 0; padding: 16px 24px; border-top: 1px solid var(--border); }
+.about-actions button { min-width: 88px; }
 main { padding: 20px 24px; max-width: 1800px; margin: auto; }
 .mode-bar, .toolbar, .mode-actions, .button-group { display: flex; align-items: center; gap: 8px; }
 .mode-bar { justify-content: space-between; margin-bottom: 18px; gap: 16px; flex-wrap: wrap; }

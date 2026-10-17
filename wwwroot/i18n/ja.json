@@ -1,6 +1,11 @@
 {
   "app.name": "StreamPrompter",
   "app.brand": "▣ StreamPrompter",
+  "about.title": "アプリ情報",
+  "about.name": "StreamPrompter（仮）",
+  "about.description": "配信・収録のスタッフと出演者で、原稿・時計・画像・アラームを共有するブラウザー型のプロンプターです。",
+  "about.status": "動作検証中の試作版（PoC）です。アプリ名や仕様は今後変更する予定です。",
+  "about.close": "閉じる",
   "page.title": "{mode} - StreamPrompter",
   "navigation.label": "画面切り替え",
   "navigation.edit": "編集",

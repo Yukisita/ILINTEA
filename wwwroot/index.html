@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261017-ui-cleanup">
-  <script type="module" src="/app.js?v=20261017-blank-alarm-messages"></script>
+  <link rel="stylesheet" href="/app.css?v=20261017-about-dialog">
+  <script type="module" src="/app.js?v=20261017-about-dialog"></script>
 </head>
 <body>
   <header class="navbar">
@@ -17,6 +17,7 @@
       <div class="mode-actions">
         <label class="language-select" for="language"><span data-i18n="language.label"></span><select id="language"><option value="ja" data-i18n="language.japanese"></option><option value="en" data-i18n="language.english"></option></select></label>
         <span id="connection" class="connection" role="status" data-i18n="connection.initial"></span><button id="copy-link" class="editor-only" data-i18n="viewer.copyUrl"></button>
+        <button id="open-about" type="button" aria-haspopup="dialog" aria-controls="about-dialog" data-i18n="about.title"></button>
       </div>
     </div>
     <div id="notice" class="notice" role="alert" hidden></div>
@@ -98,5 +99,14 @@
       </aside>
     </div>
   </main>
+  <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title" aria-describedby="about-description">
+    <header class="about-heading"><h2 id="about-title" data-i18n="about.title"></h2></header>
+    <div class="about-content">
+      <p class="about-name" data-i18n="about.name"></p>
+      <p id="about-description" data-i18n="about.description"></p>
+      <p class="about-note" data-i18n="about.status"></p>
+    </div>
+    <form method="dialog" class="about-actions"><button class="primary" type="submit" autofocus data-i18n="about.close"></button></form>
+  </dialog>
 </body>
 </html>

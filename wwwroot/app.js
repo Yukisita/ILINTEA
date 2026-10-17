@@ -932,6 +932,8 @@ if (!viewer) {
     });
 }
 
+$('open-about').addEventListener('click', () => $('about-dialog').showModal());
+
 $('language').value = locale;
 $('language').addEventListener('change', async (event) => {
     const select = event.currentTarget;
