@@ -156,6 +156,95 @@ Run("Canceling a future display hides it and pauses playback at its current posi
     Equal<DateTimeOffset?>(null, element.Playback.StartedAt);
 });
 
+Run("Every element kind supports replacing and canceling a display schedule", () =>
+{
+    foreach (var kind in new[] { "text", "clock", "image", "script", "alarm" })
+    {
+        var clock = new ManualTimeProvider();
+        var board = new BoardStore(clock);
+        var id = board.Add(kind)!.Id;
+        var first = board.ScheduleDisplay(id, 10, clock.Now.AddMinutes(1))!;
+        Assert(first.Visible, "Scheduled display was not enabled");
+        Equal(clock.Now.AddSeconds(10), first.DisplaySchedule!.At);
+        if (kind == "alarm") Equal(clock.Now.AddMinutes(1), first.AlarmSchedule!.At);
+        else Equal<AlarmSchedule?>(null, first.AlarmSchedule);
+        var updated = board.ScheduleDisplay(id, 20, clock.Now.AddMinutes(2))!;
+        Equal(clock.Now.AddSeconds(20), updated.DisplaySchedule!.At);
+        var revision = board.Snapshot().Revision;
+        Assert(!board.CancelDisplay(id, first.DisplaySchedule.Id), "Old cancellation removed a new reservation");
+        Equal(revision, board.Snapshot().Revision);
+        Assert(board.CancelDisplay(id, updated.DisplaySchedule.Id), "Current reservation was not canceled");
+        var canceled = board.Snapshot().Elements.Single();
+        Assert(!canceled.Visible && canceled.DisplaySchedule is null && canceled.AlarmSchedule is null,
+            "Canceled element remained scheduled or armed");
+    }
+});
+
+Run("Delayed alarm edits retain display time and immediate display retains its deadline", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("alarm")!.Id;
+    var scheduled = board.ScheduleDisplay(id, 10, clock.Now.AddMinutes(1))!;
+    var edited = board.Update(id, Patch(text: "finished") with { CountdownText = "counting" })!;
+    Equal(scheduled.DisplaySchedule, edited.DisplaySchedule);
+    Equal(scheduled.AlarmSchedule, edited.AlarmSchedule);
+    var changed = board.ScheduleAlarm(id, new(clock.Now.AddMinutes(2)))!;
+    Equal(scheduled.DisplaySchedule, changed.DisplaySchedule);
+    Equal(clock.Now.AddMinutes(2), changed.AlarmSchedule!.At);
+    Assert(!board.CancelAlarm(id, scheduled.AlarmSchedule!.Id), "Stale alarm stop canceled the updated deadline");
+    var shown = board.Update(id, Patch() with { Visible = true })!;
+    Assert(shown.Visible && shown.DisplaySchedule is null, "Alarm was not displayed immediately");
+    Equal(changed.AlarmSchedule, shown.AlarmSchedule);
+    Assert(!board.CancelDisplay(id, scheduled.DisplaySchedule!.Id), "Stale reservation canceled a displayed alarm");
+});
+
+Run("Hiding a delayed alarm clears both schedules and prevents a later notification", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("alarm")!.Id;
+    var scheduled = board.ScheduleDisplay(id, 10, clock.Now.AddMinutes(1))!;
+    var hidden = board.Update(id, Patch() with { Visible = false })!;
+    Assert(!hidden.Visible && hidden.DisplaySchedule is null && hidden.AlarmSchedule is null, "Hidden alarm retained a schedule");
+    clock.Now += TimeSpan.FromMinutes(2);
+    Equal(hidden, board.Snapshot().Elements.Single());
+    Assert(!board.CancelDisplay(id, scheduled.DisplaySchedule!.Id), "Old display schedule is still active");
+    Assert(!board.CancelAlarm(id, scheduled.AlarmSchedule!.Id), "Old alarm deadline is still active");
+});
+
+Run("An alarm's display reservation expires independently of its deadline", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("alarm")!.Id;
+    var scheduled = board.ScheduleDisplay(id, 10, clock.Now.AddSeconds(5))!;
+    clock.Now += TimeSpan.FromSeconds(10);
+    Assert(!board.CancelDisplay(id, scheduled.DisplaySchedule!.Id), "Display canceled after its scheduled start");
+    Assert(board.CancelAlarm(id, scheduled.AlarmSchedule!.Id), "Finished alarm could not be stopped");
+    var stopped = board.Snapshot().Elements.Single();
+    Assert(!stopped.Visible && stopped.DisplaySchedule is null && stopped.AlarmSchedule is null, "Stopped alarm remained armed");
+});
+
+Run("Invalid delayed alarms leave the existing schedules untouched and publish nothing", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var id = board.Add("alarm")!.Id;
+    board.ScheduleDisplay(id, 10, clock.Now.AddMinutes(1));
+    var before = board.Snapshot();
+    var subscription = board.Subscribe();
+    subscription.Reader.TryRead(out _);
+    foreach (var deadline in new DateTimeOffset?[] { null, clock.Now, clock.Now.AddSeconds(-1) })
+        Equal<Element?>(null, board.ScheduleDisplay(id, 20, deadline));
+    foreach (var delay in new[] { 0, -1, 86401, int.MaxValue })
+        Equal<Element?>(null, board.ScheduleDisplay(id, delay, clock.Now.AddMinutes(1)));
+    Equal(before.Revision, board.Snapshot().Revision);
+    Equal(before.Elements.Single(), board.Snapshot().Elements.Single());
+    Assert(!subscription.Reader.TryRead(out _), "Rejected schedule published an event");
+    board.Unsubscribe(subscription.Id);
+});
+
 Run("Alarms reject past and current times and remain cancelable after starting", () =>
 {
     var clock = new ManualTimeProvider();
@@ -164,10 +253,10 @@ Run("Alarms reject past and current times and remain cancelable after starting",
     Equal<Element?>(null, board.ScheduleAlarm(id, new(clock.Now.AddSeconds(-1))));
     Equal<Element?>(null, board.ScheduleAlarm(id, new(clock.Now)));
     var scheduled = board.ScheduleAlarm(id, new(clock.Now.AddSeconds(10).ToOffset(TimeSpan.FromHours(9))))!;
-    Equal(clock.Now.AddSeconds(10), scheduled.DisplaySchedule!.At);
-    Equal(TimeSpan.Zero, scheduled.DisplaySchedule.At.Offset);
+    Equal(clock.Now.AddSeconds(10), scheduled.AlarmSchedule!.At);
+    Equal(TimeSpan.Zero, scheduled.AlarmSchedule.At.Offset);
     clock.Now += TimeSpan.FromSeconds(10);
-    Assert(board.CancelDisplay(id, scheduled.DisplaySchedule.Id), "Started alarm was not canceled");
+    Assert(board.CancelAlarm(id, scheduled.AlarmSchedule.Id), "Started alarm was not canceled");
     Assert(!board.Snapshot().Elements.Single().Visible, "Canceled alarm is still visible");
 });
 
@@ -176,13 +265,13 @@ Run("Alarm message edits and repeated show patches retain the running deadline",
     var clock = new ManualTimeProvider();
     var board = new BoardStore(clock);
     var alarm = board.Add("alarm", text: "finished", countdownText: "counting")!;
-    Assert(!alarm.Visible && alarm.DisplaySchedule is null, "New alarm is enabled");
-    var schedule = board.ScheduleAlarm(alarm.Id, new(clock.Now.AddMinutes(1)))!.DisplaySchedule;
+    Assert(!alarm.Visible && alarm.AlarmSchedule is null, "New alarm is enabled");
+    var schedule = board.ScheduleAlarm(alarm.Id, new(clock.Now.AddMinutes(1)))!.AlarmSchedule;
     var edited = board.Update(alarm.Id, Patch(text: "終了") with { CountdownText = "カウント中" })!;
     Equal("終了", edited.Text);
     Equal("カウント中", edited.CountdownText);
-    Equal(schedule, edited.DisplaySchedule);
-    Equal(schedule, board.Update(alarm.Id, Patch() with { Visible = true })!.DisplaySchedule);
+    Equal(schedule, edited.AlarmSchedule);
+    Equal(schedule, board.Update(alarm.Id, Patch() with { Visible = true })!.AlarmSchedule);
 });
 
 Run("Hiding an alarm disarms it before and after its deadline", () =>
@@ -192,13 +281,13 @@ Run("Hiding an alarm disarms it before and after its deadline", () =>
         var clock = new ManualTimeProvider();
         var board = new BoardStore(clock);
         var id = board.Add("alarm")!.Id;
-        var schedule = board.ScheduleAlarm(id, new(clock.Now.AddSeconds(10)))!.DisplaySchedule!;
+        var schedule = board.ScheduleAlarm(id, new(clock.Now.AddSeconds(10)))!.AlarmSchedule!;
         clock.Now += TimeSpan.FromSeconds(elapsed);
         var hidden = board.Update(id, Patch() with { Visible = false })!;
-        Assert(!hidden.Visible && hidden.DisplaySchedule is null, "Hidden alarm is still armed");
+        Assert(!hidden.Visible && hidden.AlarmSchedule is null && hidden.DisplaySchedule is null, "Hidden alarm is still armed");
         clock.Now += TimeSpan.FromMinutes(1);
         Equal(hidden, board.Snapshot().Elements.Single());
-        Assert(!board.CancelDisplay(id, schedule.Id), "Canceled deadline is still active");
+        Assert(!board.CancelAlarm(id, schedule.Id), "Canceled deadline is still active");
     }
 });
 
@@ -209,13 +298,13 @@ Run("Restarting counting or finished alarms replaces the deadline and rejects st
         var clock = new ManualTimeProvider();
         var board = new BoardStore(clock);
         var id = board.Add("alarm")!.Id;
-        var old = board.ScheduleAlarm(id, new(clock.Now.AddSeconds(10)))!.DisplaySchedule!;
+        var old = board.ScheduleAlarm(id, new(clock.Now.AddSeconds(10)))!.AlarmSchedule!;
         clock.Now += TimeSpan.FromSeconds(elapsed);
         var restarted = board.ScheduleAlarm(id, new(clock.Now.AddMinutes(1)))!;
-        Assert(restarted.Visible && restarted.DisplaySchedule!.Id != old.Id, "Alarm did not restart");
-        Equal(clock.Now.AddMinutes(1), restarted.DisplaySchedule!.At);
+        Assert(restarted.Visible && restarted.AlarmSchedule!.Id != old.Id, "Alarm did not restart");
+        Equal(clock.Now.AddMinutes(1), restarted.AlarmSchedule!.At);
         var revision = board.Snapshot().Revision;
-        Assert(!board.CancelDisplay(id, old.Id), "Stale action stopped the restarted alarm");
+        Assert(!board.CancelAlarm(id, old.Id), "Stale action stopped the restarted alarm");
         Equal(revision, board.Snapshot().Revision);
         Equal(restarted, board.Snapshot().Elements.Single());
     }
@@ -237,7 +326,12 @@ Run("Every successful element update publishes exactly one matching snapshot", (
     var scheduled = Check(() => board.ScheduleDisplay(script.Id, 10));
     Check(() => board.CancelDisplay(script.Id, scheduled.DisplaySchedule!.Id)
         ? board.Snapshot().Elements.Single(element => element.Id == script.Id) : null);
-    Check(() => board.ScheduleAlarm(alarm.Id, new(clock.Now.AddMinutes(1))));
+    var scheduledAlarm = Check(() => board.ScheduleDisplay(alarm.Id, 10, clock.Now.AddMinutes(1)));
+    Check(() => board.CancelDisplay(alarm.Id, scheduledAlarm.DisplaySchedule!.Id)
+        ? board.Snapshot().Elements.Single(element => element.Id == alarm.Id) : null);
+    var startedAlarm = Check(() => board.ScheduleAlarm(alarm.Id, new(clock.Now.AddMinutes(1))));
+    Check(() => board.CancelAlarm(alarm.Id, startedAlarm.AlarmSchedule!.Id)
+        ? board.Snapshot().Elements.Single(element => element.Id == alarm.Id) : null);
     board.Unsubscribe(subscription.Id);
 
     Element Check(Func<Element?> update)
@@ -271,6 +365,7 @@ Run("Missing elements and wrong element kinds never change or publish board stat
         Equal<Element?>(null, board.ReplaceImage(id, new("GIF89a"u8.ToArray(), "image/gif")));
         Equal<Element?>(null, board.ControlScript(id, new("play", null)));
         Equal<Element?>(null, board.ScheduleAlarm(id, new(clock.Now.AddMinutes(1))));
+        Assert(!board.CancelAlarm(id, Guid.NewGuid()), "Wrong element accepted alarm cancellation");
         Equal<ImageData?>(null, board.GetImage(id));
     }
     var after = board.Snapshot();

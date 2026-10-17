@@ -3,7 +3,7 @@ namespace StreamPrompter;
 public record Element(Guid Id, string Kind, double X, double Y, double Width, double Height,
     string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
     ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null, string CountdownText = "",
-    long ImageRevision = 0)
+    long ImageRevision = 0, AlarmSchedule? AlarmSchedule = null)
 {
     public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}?v={ImageRevision}" : null;
 }
@@ -15,6 +15,7 @@ public record ScriptPlayback(double Speed = 30, double Offset = 0, DateTimeOffse
 }
 
 public record DisplaySchedule(Guid Id, DateTimeOffset At);
+public record AlarmSchedule(Guid Id, DateTimeOffset At);
 
 public record CanvasSettings(string AspectRatio = "16:9", string BackgroundColor = "#000000")
 {

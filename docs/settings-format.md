@@ -14,8 +14,8 @@ alignment, visibility, `countdownText`, and script speed. For alarms, `countdown
 is the counting message and `text` is the finished message. Array order is the
 layer order, from front to back. Text includes the imported TXT contents.
 
-Live timestamps, revisions, image URLs, script scroll position, and display
-schedules are excluded. Pending displays are saved hidden; already displayed
+Live timestamps, revisions, image URLs, script scroll position, display schedules,
+and alarm deadlines are excluded. Pending displays are saved hidden; already displayed
 elements retain their visibility. Scripts restore paused at the beginning.
 Alarms always restore hidden and disarmed; both messages are preserved.
 Restore assigns fresh element IDs, preventing stale client edits and image cache

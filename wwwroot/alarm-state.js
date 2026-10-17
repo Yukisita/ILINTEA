@@ -1,7 +1,9 @@
+import { elementIsVisible } from './display-state.js?v=20261017';
+
 // All alarm surfaces use the same server-adjusted time and visibility rules.
 export function getAlarmState(element, now) {
-    const deadline = Date.parse(element.displaySchedule?.at);
-    const enabled = element.visible && Number.isFinite(deadline);
+    const deadline = Date.parse(element.alarmSchedule?.at);
+    const enabled = elementIsVisible(element, now) && Number.isFinite(deadline);
     const phase = !enabled ? 'inactive' : deadline > now ? 'counting' : 'finished';
     const seconds = enabled ? Math.max(0, Math.ceil((deadline - now) / 1000)) : 0;
     const pad = value => String(value).padStart(2, '0');

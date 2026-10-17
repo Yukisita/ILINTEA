@@ -130,11 +130,19 @@ app.MapPut("/api/elements/{id:guid}/alarm", (Guid id, ScheduleAlarm request, Boa
     return element is null ? Results.NotFound(I18n.Error("errors.alarmMissing")) : Results.Ok(element);
 });
 
-app.MapPost("/api/elements/{id:guid}/display-schedule", (Guid id, ScheduleDisplay request, BoardStore board) =>
+app.MapDelete("/api/elements/{id:guid}/alarm/{scheduleId:guid}", (Guid id, Guid scheduleId, BoardStore board) =>
+    board.CancelAlarm(id, scheduleId) ? Results.NoContent()
+        : Results.NotFound(I18n.Error("errors.alarmScheduleMissing")));
+
+app.MapPost("/api/elements/{id:guid}/display-schedule", (Guid id, ScheduleDisplay request, BoardStore board, TimeProvider timeProvider) =>
 {
     if (request.DelaySeconds is < 1 or > 86400)
         return Results.BadRequest(I18n.Error("errors.displayDelay"));
-    var element = board.ScheduleDisplay(id, request.DelaySeconds);
+    var current = board.Snapshot().Elements.FirstOrDefault(element => element.Id == id);
+    if (current is null) return Results.NotFound(I18n.Error("errors.elementMissing"));
+    if (current.Kind == "alarm" && (request.AlarmAt is null || request.AlarmAt <= timeProvider.GetUtcNow()))
+        return Results.BadRequest(I18n.Error("errors.alarmFuture"));
+    var element = board.ScheduleDisplay(id, request.DelaySeconds, request.AlarmAt);
     return element is null ? Results.NotFound(I18n.Error("errors.elementMissing")) : Results.Ok(element);
 });
 app.MapDelete("/api/elements/{id:guid}/display-schedule/{scheduleId:guid}", (Guid id, Guid scheduleId, BoardStore board) =>

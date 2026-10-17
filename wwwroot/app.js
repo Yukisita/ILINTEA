@@ -2,7 +2,8 @@ import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage
 import { createEditSync } from '/edit-sync.js?v=20261014-await-edits';
 import { bindFilePicker } from '/file-picker.js?v=20261013';
 import { connectBoardEvents } from '/board-connection.js?v=20261014';
-import { getAlarmState } from '/alarm-state.js?v=20261014';
+import { getAlarmState } from '/alarm-state.js?v=20261017';
+import { displayIsWaiting as isWaiting, elementIsVisible as isVisible } from '/display-state.js?v=20261017';
 
 await initializeI18n();
 
@@ -87,7 +88,8 @@ async function requestResponse(path, options = {}) {
 function effectiveElement(element) {
     const patch = editSync.patchFor(element.id);
     const result = { ...element, ...patch };
-    if (patch.visible === false || (patch.visible === true && element.kind !== 'alarm')) result.displaySchedule = null;
+    if (patch.visible !== undefined) result.displaySchedule = null;
+    if (patch.visible === false) result.alarmSchedule = null;
     result.width = Math.max(80, Math.min(canvasWidth(), result.width));
     result.height = Math.max(48, Math.min(canvasHeight(), result.height));
     result.x = Math.max(0, Math.min(canvasWidth() - result.width, result.x));
@@ -336,11 +338,11 @@ function renderProperties() {
 }
 
 function displayIsWaiting(element) {
-    return element.visible && !!element.displaySchedule && Date.parse(element.displaySchedule.at) > Date.now() + serverOffset;
+    return isWaiting(element, Date.now() + serverOffset);
 }
 
 function elementIsVisible(element) {
-    return element.visible && (element.kind === 'alarm' || !displayIsWaiting(element));
+    return isVisible(element, Date.now() + serverOffset);
 }
 
 function renderAlarmElement(node, element, editable) {
@@ -389,24 +391,22 @@ function renderDisplayControls() {
     const element = selectedElement();
     if (viewer || !element) return;
     const waiting = displayIsWaiting(element);
-    const visible = element.visible && !waiting;
     const onProgram = elementIsVisible(element);
     const alarm = element.kind === 'alarm';
     const busy = displayActionBusy(element.id);
-    $('display-schedule-fields').hidden = alarm;
     $('alarm-settings').hidden = !alarm;
     $('alarm-at').disabled = busy;
     $('schedule-alarm').disabled = busy;
-    $('schedule-alarm').hidden = !onProgram;
+    $('schedule-alarm').hidden = !element.visible;
     if (alarm) {
-        const alarmKey = `${element.id}/${element.displaySchedule?.id ?? ''}`;
+        const alarmKey = `${element.id}/${element.alarmSchedule?.id ?? ''}`;
         if (shownAlarmId !== alarmKey && !alarmFormDirty) {
             shownAlarmId = alarmKey;
-            $('alarm-at').value = localDateTimeValue(element.displaySchedule
-                ? new Date(element.displaySchedule.at) : new Date(Date.now() + serverOffset + 5 * 60_000));
+            $('alarm-at').value = localDateTimeValue(element.alarmSchedule
+                ? new Date(element.alarmSchedule.at) : new Date(Date.now() + serverOffset + 5 * 60_000));
         }
     }
-    for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || visible;
+    for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || onProgram;
     $('toggle-visibility').disabled = busy;
     $('toggle-visibility').classList.toggle('primary', !onProgram);
     $('cancel-display').disabled = busy;
@@ -414,22 +414,18 @@ function renderDisplayControls() {
     $('confirm-delete').disabled = busy;
     $('delete-element').hidden = deleteConfirmId === element.id;
     $('delete-confirmation').hidden = deleteConfirmId !== element.id;
-    $('cancel-display').hidden = alarm || !waiting;
-    $('toggle-visibility').textContent = alarm
-        ? t(onProgram ? 'display.hide' : 'alarm.start')
-        : onProgram
-        ? t(waiting ? 'display.hideCancelSchedule' : 'display.hide')
-        : t(waiting ? 'display.showCancelSchedule' : 'display.show');
+    $('cancel-display').hidden = !waiting;
+    $('toggle-visibility').textContent = t(onProgram ? 'display.hide'
+        : waiting ? 'display.showCancelSchedule' : alarm ? 'alarm.start' : 'display.show');
     $('schedule-display').textContent = waiting ? t('display.changeSchedule') : t('display.schedule');
     const phase = alarm ? getAlarmState(element, Date.now() + serverOffset).phase : null;
     const status = t(alarm && phase !== 'inactive' ? phase === 'counting' ? 'state.countdown' : 'state.finished'
-        : waiting ? 'state.scheduled' : visible ? 'state.visible' : 'state.hidden');
+        : waiting ? 'state.scheduled' : onProgram ? 'state.visible' : 'state.hidden');
     if ($('display-state').textContent !== status) $('display-state').textContent = status;
-    $('display-state').className = `display-state ${waiting ? 'waiting' : visible ? 'visible' : ''}`;
-    $('display-status').hidden = alarm;
-    $('display-status').textContent = alarm ? '' : waiting
+    $('display-state').className = `display-state ${waiting ? 'waiting' : onProgram ? 'visible' : ''}`;
+    $('display-status').textContent = waiting
         ? t('display.waiting', { seconds: Math.ceil((Date.parse(element.displaySchedule.at) - Date.now() - serverOffset) / 1000) })
-        : visible ? t('display.hideBeforeSchedule') : t('display.hiddenUntilSchedule');
+        : onProgram ? t('display.hideBeforeSchedule') : t('display.hiddenUntilSchedule');
 }
 
 function toggleElementVisibility() {
@@ -453,26 +449,37 @@ async function scheduleDisplay(cancel = false) {
         return;
     }
     if (cancel && !element.displaySchedule) return;
+    const alarmAt = !cancel && element.kind === 'alarm' ? readAlarmDate() : null;
+    if (!cancel && element.kind === 'alarm' && !alarmAt) return;
     displayBusy = true;
     renderDisplayControls();
     try {
         if (!await flushEdits()) return;
         const path = `/api/elements/${element.id}/display-schedule`;
         if (cancel) await request(`${path}/${element.displaySchedule.id}`, { method: 'DELETE' });
-        else await requestJson(path, 'POST', { delaySeconds: seconds });
+        else {
+            await requestJson(path, 'POST', { delaySeconds: seconds, alarmAt: alarmAt?.toISOString() });
+            if (alarmAt) alarmFormDirty = false;
+        }
         await refreshBoard();
     } catch (error) { notify(error.message); }
     finally { displayBusy = false; renderDisplayControls(); }
 }
 
-async function scheduleAlarm() {
-    const element = selectedElement();
-    if (element?.kind !== 'alarm' || displayActionBusy(element.id)) return;
+function readAlarmDate() {
     const date = new Date($('alarm-at').value);
     if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now() + serverOffset) {
         notify(t('errors.alarmFuture'));
-        return;
+        return null;
     }
+    return date;
+}
+
+async function scheduleAlarm() {
+    const element = selectedElement();
+    if (element?.kind !== 'alarm' || displayActionBusy(element.id)) return;
+    const date = readAlarmDate();
+    if (!date) return;
     displayBusy = true;
     renderDisplayControls();
     try {
@@ -655,7 +662,7 @@ async function clearAlarm() {
     try {
         for (const element of alarms) {
             // The schedule ID prevents an old stop action from cancelling a newer reservation.
-            await request(`/api/elements/${element.id}/display-schedule/${element.displaySchedule.id}`, { method: 'DELETE' });
+            await request(`/api/elements/${element.id}/alarm/${element.alarmSchedule.id}`, { method: 'DELETE' });
         }
         await refreshBoard();
     } catch (error) { notify(error.message); }

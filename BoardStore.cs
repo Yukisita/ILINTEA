@@ -28,7 +28,8 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
             {
                 Visible = element.Kind != "alarm" && element.Visible &&
                     (element.DisplaySchedule is null || element.DisplaySchedule.At <= now),
-                DisplaySchedule = null
+                DisplaySchedule = null,
+                AlarmSchedule = null
             }).ToArray(), new(images));
         }
     }
@@ -120,8 +121,8 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 CountdownText = patch.CountdownText ?? current.CountdownText,
                 Playback = playback,
                 // Showing an alarm must retain its deadline; hiding it disarms it immediately.
-                DisplaySchedule = patch.Visible is false || (patch.Visible is true && current.Kind != "alarm")
-                    ? null : current.DisplaySchedule
+                DisplaySchedule = patch.Visible is not null ? null : current.DisplaySchedule,
+                AlarmSchedule = patch.Visible is false ? null : current.AlarmSchedule
             });
         });
 
@@ -185,26 +186,33 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
             return element with { Playback = playback };
         }, kind: "script");
 
-    public Element? ScheduleDisplay(Guid id, int delaySeconds) =>
+    public Element? ScheduleDisplay(Guid id, int delaySeconds, DateTimeOffset? alarmAt = null) =>
         UpdateElement(id, element =>
         {
             var now = clock.GetUtcNow();
+            if (delaySeconds is < 1 or > 86400 ||
+                (element.Kind == "alarm" && (alarmAt is null || alarmAt <= now))) return null;
             var schedule = new DisplaySchedule(Guid.NewGuid(), now.AddSeconds(delaySeconds));
             var playback = element.Playback;
             if (playback?.StartedAt is not null)
                 playback = playback with { Offset = playback.PositionAt(now), StartedAt = schedule.At };
-            return element with { Visible = true, DisplaySchedule = schedule, Playback = playback };
+            // Reserve display and the alarm deadline together, without briefly putting the alarm on air.
+            return element with
+            {
+                Visible = true, DisplaySchedule = schedule, Playback = playback,
+                AlarmSchedule = element.Kind == "alarm"
+                    ? new(Guid.NewGuid(), alarmAt!.Value.ToUniversalTime()) : element.AlarmSchedule
+            };
         });
 
     public bool CancelDisplay(Guid id, Guid scheduleId) =>
         UpdateElement(id, element =>
         {
             var now = clock.GetUtcNow();
-            if (element.DisplaySchedule?.Id != scheduleId ||
-                (element.Kind != "alarm" && element.DisplaySchedule.At <= now)) return null;
+            if (element.DisplaySchedule?.Id != scheduleId || element.DisplaySchedule.At <= now) return null;
             var playback = element.Playback;
             if (playback is not null) playback = playback with { Offset = playback.PositionAt(now), StartedAt = null };
-            return element with { Visible = false, DisplaySchedule = null, Playback = playback };
+            return element with { Visible = false, DisplaySchedule = null, AlarmSchedule = null, Playback = playback };
         }) is not null;
 
     public Element? ScheduleAlarm(Guid id, ScheduleAlarm request) =>
@@ -214,9 +222,15 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
             return element with
             {
                 Visible = true,
-                DisplaySchedule = new(Guid.NewGuid(), request.At.ToUniversalTime())
+                AlarmSchedule = new(Guid.NewGuid(), request.At.ToUniversalTime())
             };
         }, kind: "alarm");
+
+    public bool CancelAlarm(Guid id, Guid scheduleId) =>
+        UpdateElement(id, element => element.AlarmSchedule?.Id != scheduleId ? null : element with
+        {
+            Visible = false, DisplaySchedule = null, AlarmSchedule = null
+        }, kind: "alarm") is not null;
 
     // Lookup, mutation and publication share one lock; rejected updates publish nothing.
     private Element? UpdateElement(Guid id, Func<Element, Element?> update, string? kind = null)

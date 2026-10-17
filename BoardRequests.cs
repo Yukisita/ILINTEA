@@ -8,7 +8,7 @@ public record ScriptControl(string Action, double? Speed)
         (Action == "speed" && Speed is >= 5 and <= 200);
 }
 
-public record ScheduleDisplay(int DelaySeconds);
+public record ScheduleDisplay(int DelaySeconds, DateTimeOffset? AlarmAt = null);
 public record ScheduleAlarm(DateTimeOffset At);
 public record CreateElement(string Kind, string? Text = null, string? CountdownText = null);
 public record MoveElement(int Offset);

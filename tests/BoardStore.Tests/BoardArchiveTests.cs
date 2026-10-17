@@ -45,7 +45,7 @@ internal static class BoardArchiveTests
                 Assert(!original.Elements.Any(element => element.Id == actual.Id), "Element ID was reused");
                 Equal(expected with
                 {
-                    Id = actual.Id, ImageRevision = 0, DisplaySchedule = null,
+                    Id = actual.Id, ImageRevision = 0, DisplaySchedule = null, AlarmSchedule = null,
                     Visible = expected.Kind is "script" or "alarm" ? false : expected.Visible,
                     Playback = expected.Kind == "script" ? new(Speed: 75) : null
                 }, actual);
@@ -106,7 +106,24 @@ internal static class BoardArchiveTests
             var original = source.Snapshot();
             using var archive = new MemoryStream(await SaveAsync(source));
             var restored = (await BoardArchive.RestoreAsync(archive, new BoardStore(clock))).Elements.Single();
-            Assert(!restored.Visible && restored.DisplaySchedule is null, "Restored alarm is armed");
+            Assert(!restored.Visible && restored.AlarmSchedule is null && restored.DisplaySchedule is null, "Restored alarm is armed");
+            Equal("counting", restored.CountdownText);
+            Equal("finished", restored.Text);
+            Equal(original.Revision, source.Snapshot().Revision);
+            Equal(original.Elements.Single(), source.Snapshot().Elements.Single());
+        });
+
+        await Run("A delayed alarm restores hidden with both schedules cleared without altering the live board", async () =>
+        {
+            var clock = new ManualTimeProvider();
+            var source = new BoardStore(clock);
+            var id = source.Add("alarm", text: "finished", countdownText: "counting")!.Id;
+            source.ScheduleDisplay(id, 10, clock.Now.AddMinutes(1));
+            var original = source.Snapshot();
+            using var archive = new MemoryStream(await SaveAsync(source));
+            var restored = (await BoardArchive.RestoreAsync(archive, new BoardStore(clock))).Elements.Single();
+            Assert(!restored.Visible && restored.DisplaySchedule is null && restored.AlarmSchedule is null,
+                "Restored alarm retained a schedule");
             Equal("counting", restored.CountdownText);
             Equal("finished", restored.Text);
             Equal(original.Revision, source.Snapshot().Revision);
@@ -122,7 +139,7 @@ internal static class BoardArchiveTests
             json["elements"]![0]!["countdownText"] = "counting";
             using var archive = new MemoryStream(CreateArchive(json.ToJsonString()));
             var element = (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Single();
-            Assert(!element.Visible && element.DisplaySchedule is null, "Restored alarm is enabled");
+            Assert(!element.Visible && element.AlarmSchedule is null && element.DisplaySchedule is null, "Restored alarm is enabled");
             Equal("finished", element.Text);
             Equal("counting", element.CountdownText);
         });

@@ -7,7 +7,7 @@ const alarm = {
     visible: true,
     text: '終了 🌟',
     countdownText: 'カウント中\nremaining',
-    displaySchedule: { at: new Date(deadline).toISOString() }
+    alarmSchedule: { at: new Date(deadline).toISOString() }
 };
 
 test('countdown and its message are shown together until the deadline', () => {
@@ -34,8 +34,8 @@ test('hidden alarms are inactive before, at and after their deadline', () => {
 });
 
 test('unscheduled or invalid deadlines do not produce a finished alarm or a NaN counter', () => {
-    for (const displaySchedule of [null, undefined, { at: 'invalid' }]) {
-        assert.deepEqual(getAlarmState({ ...alarm, displaySchedule }, deadline), {
+    for (const alarmSchedule of [null, undefined, { at: 'invalid' }]) {
+        assert.deepEqual(getAlarmState({ ...alarm, alarmSchedule }, deadline), {
             phase: 'inactive', remaining: '00:00:00', message: alarm.countdownText
         });
     }
@@ -54,5 +54,26 @@ test('blank messages do not remove the remaining time', () => {
     });
     assert.deepEqual(getAlarmState(blank, deadline), {
         phase: 'finished', remaining: '00:00:00', message: ''
+    });
+});
+
+test('a delayed alarm starts counting only when displayed and retains its independent deadline', () => {
+    const start = deadline - 30_000;
+    const scheduled = { ...alarm, displaySchedule: { at: new Date(start).toISOString() } };
+    assert.equal(getAlarmState(scheduled, start - 1).phase, 'inactive');
+    assert.deepEqual(getAlarmState(scheduled, start), {
+        phase: 'counting', remaining: '00:00:30', message: alarm.countdownText
+    });
+    assert.equal(getAlarmState(scheduled, deadline).phase, 'finished');
+    assert.equal(getAlarmState({ ...scheduled, visible: false }, deadline).phase, 'inactive');
+});
+
+test('a deadline passed while waiting does not notify until the scheduled display', () => {
+    const start = deadline + 30_000;
+    const scheduled = { ...alarm, displaySchedule: { at: new Date(start).toISOString() } };
+    for (const now of [deadline - 1, deadline, start - 1])
+        assert.equal(getAlarmState(scheduled, now).phase, 'inactive');
+    assert.deepEqual(getAlarmState(scheduled, start), {
+        phase: 'finished', remaining: '00:00:00', message: alarm.text
     });
 });
