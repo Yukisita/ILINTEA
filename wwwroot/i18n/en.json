@@ -20,7 +20,6 @@
   "viewer.flipY": "↕ Flip vertically",
   "viewer.fullscreen": "⛶ Fullscreen",
   "viewer.exitFullscreen": "Exit fullscreen",
-  "viewer.help": "Flips apply only to this device. Controls are hidden in fullscreen.",
   "viewer.alarmActive": "Active alarms: {count}",
   "viewer.alarmWaiting": "Counting alarms: {count}",
   "viewer.stopAlarm": "Dismiss alarm",

@@ -176,7 +176,6 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid var(--border); 
 .viewer .monitor-grid { display: block; }
 .viewer .preview-monitor { border: 0; background: transparent; }
 .viewer .stage-host { background: var(--surface-muted); height: calc(100dvh - 250px); min-height: 250px; }
-.viewer-help { justify-content: center; font-size: 12px; color: var(--muted); margin: 16px 0 0; }
 .fullscreen-exit { display: none; }
 .stage-host:fullscreen { width: 100vw; height: 100dvh; padding: 0; border: 0; border-radius: 0; background: #000; }
 .stage-host:fullscreen .fullscreen-exit { display: block; position: absolute; top: 14px; right: 14px; opacity: 0; transition: opacity .2s; }
@@ -241,5 +240,4 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid var(--border); 
   .toolbar { padding: 12px; }
   .stage-host { padding: 8px; }
   .viewer .stage-host { height: calc(100dvh - 280px); }
-  .viewer-help { line-height: 1.7; }
 }

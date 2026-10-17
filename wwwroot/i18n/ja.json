@@ -20,7 +20,6 @@
   "viewer.flipY": "↕ 上下反転",
   "viewer.fullscreen": "⛶ 全画面",
   "viewer.exitFullscreen": "全画面を終了",
-  "viewer.help": "反転はこの端末だけに適用されます。全画面では操作バーが隠れます。",
   "viewer.alarmActive": "アラーム {count}件・通知中",
   "viewer.alarmWaiting": "アラーム {count}件・カウント中",
   "viewer.stopAlarm": "通知を止める",
