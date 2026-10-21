@@ -103,6 +103,9 @@ main { padding: 20px 24px; max-width: 1800px; margin: auto; }
 .program-monitor .monitor-dot { background: #ff5c69; }
 body:not(.viewer) .monitor .stage-host { border: 0; border-radius: 0; padding: 12px; background: #14181c; }
 .stage-host { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 8px; padding: 24px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
+.screen-highlight { position: absolute; inset: 0; z-index: 101; display: flex; justify-content: center; align-items: start; padding: 12px; border: 12px solid var(--warning-border); border-radius: inherit; box-shadow: inset 0 0 32px #e8b94a66; pointer-events: none; }
+.screen-highlight span { max-width: 100%; padding: 8px 16px; border: 1px solid var(--warning-border); border-radius: var(--control-radius); background: var(--warning-soft); color: var(--warning); font-size: clamp(14px, 1.8vw, 24px); font-weight: 700; line-height: 1.4; text-align: center; box-shadow: 0 2px 12px #0003; }
+.viewer .screen-highlight { position: fixed; border-radius: 0; }
 .stage-viewport { position: relative; flex: none; overflow: hidden; background: #000; box-shadow: 0 2px 8px #0002; }
 .stage { position: absolute; width: 1280px; height: 720px; left: 0; top: 0; background: #000; transform-origin: top left; overflow: hidden; color: #fff; }
 .element { position: absolute; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -63,6 +63,27 @@ internal static class BoardArchiveTests
             target.Unsubscribe(subscription.Id);
         });
 
+        await Run("Screen highlights are not saved or restored and saving leaves the live highlight unchanged", async () =>
+        {
+            var clock = new ManualTimeProvider();
+            var source = new BoardStore(clock);
+            source.Add("text");
+            var live = source.HighlightScreen();
+            var bytes = await SaveAsync(source);
+            using (var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read))
+            using (var reader = new StreamReader(zip.GetEntry("settings.json")!.Open()))
+                Assert(!JsonNode.Parse(await reader.ReadToEndAsync())!.AsObject().ContainsKey("highlight"),
+                    "Archive contains a transient highlight");
+            Equal(live.Highlight, source.Snapshot().Highlight);
+            Equal(live.Revision, source.Snapshot().Revision);
+            var target = new BoardStore(clock);
+            target.HighlightScreen();
+            using var archive = new MemoryStream(bytes);
+            var restored = await BoardArchive.RestoreAsync(archive, target);
+            Equal<ScreenHighlight?>(null, restored.Highlight);
+            Equal<ScreenHighlight?>(null, target.Snapshot().Highlight);
+        });
+
         // A fixed fixture protects the current contract independently of the exporter.
         const string version2 = """
             {

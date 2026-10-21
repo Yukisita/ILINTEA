@@ -28,6 +28,12 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapGet("/api/board", (BoardStore board) => board.Snapshot());
+app.MapPost("/api/highlight", (BoardStore board) => board.HighlightScreen());
+app.MapDelete("/api/highlight/{id:guid}", (Guid id, BoardStore board) =>
+{
+    var snapshot = board.ClearHighlight(id);
+    return snapshot is null ? Results.NotFound(I18n.Error("errors.highlightMissing")) : Results.Ok(snapshot);
+});
 app.MapGet("/api/settings/download", async (BoardStore board, CancellationToken cancellationToken) =>
 {
     var file = CreateTemporaryFile();

@@ -34,6 +34,7 @@ let canvasSaving = false;
 let orderBusy = false;
 let addBusy = false;
 let settingsBusy = false;
+let highlightBusy = false;
 const canvasWidth = () => state.canvas?.width ?? 1280;
 const canvasHeight = () => state.canvas?.height ?? 720;
 const editSync = createEditSync({
@@ -629,6 +630,7 @@ function updateClocks() {
         }
     }
     renderAlarm();
+    renderHighlight();
     updateScheduledVisibility();
     renderScriptControls();
     renderDisplayControls();
@@ -650,6 +652,30 @@ function renderAlarm() {
     $('stop-alarm').hidden = active.length === 0;
     $('stop-alarm').textContent = active.length > 1 ? t('viewer.stopAllAlarms') : t('viewer.stopAlarm');
     $('stop-alarm').disabled = !connected || alarmSaving;
+}
+
+function renderHighlight() {
+    const active = !!state.highlight && Date.parse(state.highlight.until) > Date.now() + serverOffset;
+    $('viewer-highlight').hidden = !viewer || !active;
+    $('program-highlight').hidden = viewer || !active;
+    if (viewer) return;
+    const button = $('highlight-screen');
+    button.disabled = !connected || settingsBusy || highlightBusy;
+    button.setAttribute('aria-pressed', String(active));
+    const label = t(active ? 'highlight.stop' : 'highlight.start');
+    if (button.textContent !== label) button.textContent = label;
+}
+
+async function highlightScreen() {
+    if (!connected || settingsBusy || highlightBusy) return;
+    const active = state.highlight && Date.parse(state.highlight.until) > Date.now() + serverOffset;
+    const path = active ? `/api/highlight/${state.highlight.id}` : '/api/highlight';
+    highlightBusy = true;
+    renderHighlight();
+    try {
+        acceptState(await request(path, { method: active ? 'DELETE' : 'POST' }));
+    } catch (error) { notify(error.message); }
+    finally { highlightBusy = false; renderHighlight(); }
 }
 
 async function clearAlarm() {
@@ -692,7 +718,7 @@ function acceptState(snapshot) {
 async function refreshBoard() { acceptState(await request('/api/board')); }
 
 function settingsActionBusy() {
-    return canvasActionBusy() || addBusy || displayBusy || scriptBusy || imageBusy || alarmSaving || orderBusy;
+    return canvasActionBusy() || addBusy || displayBusy || scriptBusy || imageBusy || alarmSaving || orderBusy || highlightBusy;
 }
 
 function renderSettingsControls() {
@@ -777,6 +803,7 @@ function setConnection(value) {
         if (changed) renderList();
     }
     renderAlarm();
+    renderHighlight();
 }
 
 connectBoardEvents({
@@ -845,6 +872,7 @@ async function loadScriptFile(file, id = null) {
 }
 
 if (!viewer) {
+    $('highlight-screen').addEventListener('click', highlightScreen);
     $('download-settings').addEventListener('click', downloadSettings);
     bindFilePicker($('upload-settings'), $('settings-file'), uploadSettings, { canOpen: () => !settingsActionBusy() });
     $('aspect-ratio').addEventListener('change', () => updateCanvas({ aspectRatio: $('aspect-ratio').value }));

@@ -6,6 +6,7 @@ namespace StreamPrompter;
 public sealed class BoardStore(TimeProvider? timeProvider = null)
 {
     public const int MaxElements = 20;
+    public const int HighlightDurationSeconds = 5;
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private readonly object gate = new();
     private readonly List<Element> elements = [];
@@ -13,10 +14,32 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
     private readonly Dictionary<Guid, Channel<BoardSnapshot>> subscribers = [];
     private long revision;
     private CanvasSettings canvas = new();
+    private ScreenHighlight? highlight;
 
     public BoardSnapshot Snapshot()
     {
         lock (gate) return SnapshotCore();
+    }
+
+    public BoardSnapshot HighlightScreen()
+    {
+        lock (gate)
+        {
+            highlight = new(Guid.NewGuid(), clock.GetUtcNow().AddSeconds(HighlightDurationSeconds));
+            Publish();
+            return SnapshotCore();
+        }
+    }
+
+    public BoardSnapshot? ClearHighlight(Guid id)
+    {
+        lock (gate)
+        {
+            if (highlight?.Id != id) return null;
+            highlight = null;
+            Publish();
+            return SnapshotCore();
+        }
     }
 
     internal BoardBackupState CaptureBackup()
@@ -43,6 +66,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
         lock (gate)
         {
             canvas = backup.Canvas;
+            highlight = null;
             elements.Clear();
             elements.AddRange(restored.Select(item => item.Original with { Id = item.Id }));
             images.Clear();
@@ -286,7 +310,12 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
         };
     }
 
-    private BoardSnapshot SnapshotCore() => new(revision, clock.GetUtcNow().ToUnixTimeMilliseconds(), elements.ToArray(), canvas);
+    private BoardSnapshot SnapshotCore()
+    {
+        var now = clock.GetUtcNow();
+        return new(revision, now.ToUnixTimeMilliseconds(), elements.ToArray(), canvas,
+            highlight?.Until > now ? highlight : null);
+    }
 
     private void Publish()
     {

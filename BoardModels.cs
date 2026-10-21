@@ -16,6 +16,7 @@ public record ScriptPlayback(double Speed = 30, double Offset = 0, DateTimeOffse
 
 public record DisplaySchedule(Guid Id, DateTimeOffset At);
 public record AlarmSchedule(Guid Id, DateTimeOffset At);
+public record ScreenHighlight(Guid Id, DateTimeOffset Until);
 
 public record CanvasSettings(string AspectRatio = "16:9", string BackgroundColor = "#000000")
 {
@@ -23,4 +24,5 @@ public record CanvasSettings(string AspectRatio = "16:9", string BackgroundColor
     public double Height => AspectRatio switch { "16:9" => 720, "4:3" => 960, _ => 1280 };
 }
 
-public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, CanvasSettings Canvas);
+public record BoardSnapshot(long Revision, long ServerTime, Element[] Elements, CanvasSettings Canvas,
+    ScreenHighlight? Highlight = null);

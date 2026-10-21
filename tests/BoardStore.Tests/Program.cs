@@ -96,6 +96,67 @@ Run("Snapshots and subscription events use the supplied clock", () =>
     board.Unsubscribe(subscription.Id);
 });
 
+Run("Screen highlights reach all subscribers without changing elements and expire after five seconds", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    board.Add("text");
+    var before = board.Snapshot();
+    var first = board.Subscribe();
+    var second = board.Subscribe();
+    first.Reader.TryRead(out _);
+    second.Reader.TryRead(out _);
+    var snapshot = board.HighlightScreen();
+    Equal(before.Revision + 1, snapshot.Revision);
+    Equal(clock.Now.AddSeconds(5), snapshot.Highlight!.Until);
+    Equal(before.Canvas, snapshot.Canvas);
+    Assert(before.Elements.SequenceEqual(snapshot.Elements), "Highlight changed board elements");
+    foreach (var subscription in new[] { first, second })
+    {
+        Assert(subscription.Reader.TryRead(out var published), "Subscriber missed highlight");
+        Equal(snapshot.Highlight, published!.Highlight);
+        Equal(snapshot.Revision, published.Revision);
+        Assert(!subscription.Reader.TryRead(out _), "Highlight published extra events");
+    }
+    clock.Now += TimeSpan.FromMilliseconds(4999);
+    Equal(snapshot.Highlight, board.Snapshot().Highlight);
+    var reconnected = board.Subscribe();
+    Assert(reconnected.Reader.TryRead(out var current), "Reconnect missed current board");
+    Equal(snapshot.Highlight, current!.Highlight);
+    clock.Now += TimeSpan.FromMilliseconds(1);
+    Equal<ScreenHighlight?>(null, board.Snapshot().Highlight);
+    var late = board.Subscribe();
+    Assert(late.Reader.TryRead(out var expired), "Late subscriber missed initial board");
+    Equal<ScreenHighlight?>(null, expired!.Highlight);
+    Equal(snapshot.Revision, expired.Revision);
+    foreach (var subscription in new[] { first, second, reconnected, late }) board.Unsubscribe(subscription.Id);
+});
+
+Run("Highlights can be renewed or cleared and stale cancellation cannot clear a newer highlight", () =>
+{
+    var clock = new ManualTimeProvider();
+    var board = new BoardStore(clock);
+    var old = board.HighlightScreen();
+    clock.Now += TimeSpan.FromSeconds(2);
+    var current = board.HighlightScreen();
+    Assert(old.Highlight!.Id != current.Highlight!.Id, "Highlight reused an ID");
+    Equal(clock.Now.AddSeconds(5), current.Highlight.Until);
+    var subscription = board.Subscribe();
+    subscription.Reader.TryRead(out _);
+    Equal<BoardSnapshot?>(null, board.ClearHighlight(old.Highlight.Id));
+    Equal(current.Revision, board.Snapshot().Revision);
+    Equal(current.Highlight, board.Snapshot().Highlight);
+    Assert(!subscription.Reader.TryRead(out _), "Stale cancellation published an event");
+    var cleared = board.ClearHighlight(current.Highlight.Id)!;
+    Equal<ScreenHighlight?>(null, cleared.Highlight);
+    Equal(current.Revision + 1, cleared.Revision);
+    Assert(subscription.Reader.TryRead(out var published), "Clear was not published");
+    Equal<ScreenHighlight?>(null, published!.Highlight);
+    Assert(!subscription.Reader.TryRead(out _), "Clear published extra events");
+    Equal<BoardSnapshot?>(null, board.ClearHighlight(current.Highlight.Id));
+    board.Unsubscribe(subscription.Id);
+});
+
 Run("Playback retains its position across speed changes, pause and resume", () =>
 {
     var clock = new ManualTimeProvider();
