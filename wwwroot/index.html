@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261021-screen-highlight">
+  <link rel="stylesheet" href="/app.css?v=20261022-highlight-pulse">
   <script type="module" src="/app.js?v=20261021-screen-highlight"></script>
 </head>
 <body>
@@ -41,7 +41,7 @@
             <div class="monitor-heading editor-only"><h2><span class="monitor-dot"></span><span data-i18n="monitor.preview"></span></h2></div>
             <div id="stage-host" class="stage-host">
               <div id="stage-viewport" class="stage-viewport"><div id="stage" class="stage"></div></div>
-              <div id="viewer-highlight" class="screen-highlight viewer-only" role="alert" hidden><span data-i18n="highlight.message"></span></div>
+              <div id="viewer-highlight" class="screen-highlight viewer-only" aria-hidden="true" hidden></div>
               <button id="exit-fullscreen" class="fullscreen-exit" data-i18n="viewer.exitFullscreen"></button>
               <button id="stop-alarm" class="stop-alarm viewer-only" hidden data-i18n="viewer.stopAlarm"></button>
             </div>
@@ -50,7 +50,7 @@
             <div class="monitor-heading"><h2><span class="monitor-dot"></span><span data-i18n="monitor.program"></span></h2></div>
             <div id="program-host" class="stage-host">
               <div id="program-viewport" class="stage-viewport"><div id="program-stage" class="stage"></div></div>
-              <div id="program-highlight" class="screen-highlight" aria-hidden="true" hidden><span data-i18n="highlight.message"></span></div>
+              <div id="program-highlight" class="screen-highlight" aria-hidden="true" hidden></div>
             </div>
           </section>
         </div>
