@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261022-highlight-pulse">
-  <script type="module" src="/app.js?v=20261021-screen-highlight"></script>
+  <link rel="stylesheet" href="/app.css?v=20261022-settings-drawer">
+  <script type="module" src="/app.js?v=20261022-settings-drawer"></script>
 </head>
 <body>
   <header class="navbar">
@@ -13,19 +13,18 @@
   </header>
   <main>
     <div class="mode-bar">
-      <nav class="mode-tabs" data-i18n-aria-label="navigation.label"><a href="/" id="edit-tab" data-i18n="navigation.edit"></a><a href="/view/" id="view-tab" data-i18n="navigation.view"></a></nav>
+      <div class="mode-navigation">
+        <button id="open-settings" type="button" aria-haspopup="dialog" aria-controls="settings-dialog"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg><span data-i18n="settings.title"></span></button>
+        <nav class="mode-tabs" data-i18n-aria-label="navigation.label"><a href="/" id="edit-tab" data-i18n="navigation.edit"></a><a href="/view/" id="view-tab" data-i18n="navigation.view"></a></nav>
+      </div>
       <div class="mode-actions">
-        <label class="language-select" for="language"><span data-i18n="language.label"></span><select id="language"><option value="ja" data-i18n="language.japanese"></option><option value="en" data-i18n="language.english"></option></select></label>
-        <span id="connection" class="connection" role="status" data-i18n="connection.initial"></span><button id="copy-link" class="editor-only" data-i18n="viewer.copyUrl"></button>
+        <span id="connection" class="connection" role="status" data-i18n="connection.initial"></span>
         <button id="highlight-screen" class="accent editor-only" type="button" disabled aria-pressed="false" data-i18n="highlight.start" data-i18n-title="highlight.description"></button>
-        <button id="open-about" type="button" aria-haspopup="dialog" aria-controls="about-dialog" data-i18n="about.title"></button>
       </div>
     </div>
     <div id="notice" class="notice" role="alert" hidden></div>
     <div class="toolbar editor-only">
       <div class="button-group"><button id="add-clock" disabled data-i18n="add.clock"></button><button id="add-text" disabled data-i18n="add.text"></button><button id="add-alarm" disabled data-i18n="add.alarm"></button><button id="add-image" disabled data-i18n="add.image"></button><button id="add-script" disabled data-i18n="add.script"></button><input id="image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden><input id="script-file" type="file" accept=".txt,text/plain" hidden></div>
-      <div class="canvas-settings"><label for="aspect-ratio" data-i18n="canvas.ratio"></label><select id="aspect-ratio" disabled><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="3:4" data-i18n="canvas.ratioPortrait34"></option><option value="9:16" data-i18n="canvas.ratioPortrait916"></option></select><label for="background-color" data-i18n="canvas.background"></label><input id="background-color" type="color" value="#000000" disabled></div>
-      <div class="button-group" data-i18n-title="settings.scope"><button id="download-settings" type="button" disabled data-i18n="settings.download"></button><button id="upload-settings" type="button" disabled data-i18n="settings.upload"></button><input id="settings-file" type="file" accept=".zip,application/zip" hidden></div>
     </div>
     <div class="toolbar viewer-only">
       <span id="viewer-alarm-status" class="muted"></span><div class="button-group"><button id="flip-x" aria-pressed="false" data-i18n="viewer.flipX"></button><button id="flip-y" aria-pressed="false" data-i18n="viewer.flipY"></button><button id="fullscreen" data-i18n="viewer.fullscreen"></button></div>
@@ -102,6 +101,37 @@
       </aside>
     </div>
   </main>
+  <dialog id="settings-dialog" class="settings-drawer" aria-labelledby="settings-title">
+    <header class="settings-header">
+      <h2 id="settings-title" data-i18n="settings.title"></h2>
+      <form method="dialog"><button class="settings-close" type="submit" autofocus data-i18n-aria-label="settings.close"><span aria-hidden="true">×</span></button></form>
+    </header>
+    <div id="settings-notice-slot"></div>
+    <div class="settings-content">
+      <section class="settings-section">
+        <label for="language" data-i18n="language.label"></label>
+        <select id="language"><option value="ja" data-i18n="language.japanese"></option><option value="en" data-i18n="language.english"></option></select>
+      </section>
+      <section class="settings-section editor-only" aria-labelledby="canvas-settings-title">
+        <h3 id="canvas-settings-title" data-i18n="settings.canvas"></h3>
+        <div class="canvas-settings">
+          <div class="settings-field"><label for="aspect-ratio" data-i18n="canvas.ratio"></label><select id="aspect-ratio" disabled><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="3:4" data-i18n="canvas.ratioPortrait34"></option><option value="9:16" data-i18n="canvas.ratioPortrait916"></option></select></div>
+          <div class="settings-field"><label for="background-color" data-i18n="canvas.background"></label><input id="background-color" type="color" value="#000000" disabled></div>
+        </div>
+      </section>
+      <section class="settings-section editor-only" aria-labelledby="settings-files-title">
+        <h3 id="settings-files-title" data-i18n="settings.files"></h3>
+        <div class="settings-actions" data-i18n-title="settings.scope"><button id="download-settings" type="button" disabled data-i18n="settings.download"></button><button id="upload-settings" type="button" disabled data-i18n="settings.upload"></button><input id="settings-file" type="file" accept=".zip,application/zip" hidden></div>
+      </section>
+      <section class="settings-section editor-only" aria-labelledby="settings-sharing-title">
+        <h3 id="settings-sharing-title" data-i18n="settings.sharing"></h3>
+        <button id="copy-link" type="button" data-i18n="viewer.copyUrl"></button>
+      </section>
+      <section class="settings-section">
+        <button id="open-about" type="button" aria-haspopup="dialog" aria-controls="about-dialog" data-i18n="about.title"></button>
+      </section>
+    </div>
+  </dialog>
   <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title" aria-describedby="about-description">
     <header class="about-heading"><h2 id="about-title" data-i18n="about.title"></h2></header>
     <div class="about-content">

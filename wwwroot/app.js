@@ -960,6 +960,19 @@ if (!viewer) {
     });
 }
 
+const settingsDialog = $('settings-dialog');
+$('open-settings').addEventListener('click', () => {
+    $('settings-notice-slot').append($('notice'));
+    settingsDialog.showModal();
+});
+settingsDialog.addEventListener('close', () => document.querySelector('.mode-bar').after($('notice')));
+settingsDialog.addEventListener('pointerdown', event => {
+    if (event.target !== settingsDialog) return;
+    const bounds = settingsDialog.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)
+        settingsDialog.close();
+});
+
 $('open-about').addEventListener('click', () => $('about-dialog').showModal());
 
 $('language').value = locale;
