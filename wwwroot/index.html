@@ -4,21 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261022-settings-drawer">
+  <link rel="stylesheet" href="/app.css?v=20261023-crec-design">
   <script type="module" src="/app.js?v=20261022-settings-drawer"></script>
 </head>
 <body>
   <header class="navbar">
-    <a class="brand" href="/" data-i18n="app.brand"></a>
+    <div class="navbar-start">
+      <button id="open-settings" class="navbar-button" type="button" aria-haspopup="dialog" aria-controls="settings-dialog"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg><span data-i18n="settings.title"></span></button>
+    </div>
+    <a class="brand" href="/"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M7 3h14v14M3 7h14v14H3z"/></svg><span data-i18n="app.brand"></span></a>
+    <div class="navbar-end"><span id="connection" class="connection" role="status" data-i18n="connection.initial"></span></div>
   </header>
   <main>
     <div class="mode-bar">
-      <div class="mode-navigation">
-        <button id="open-settings" type="button" aria-haspopup="dialog" aria-controls="settings-dialog"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg><span data-i18n="settings.title"></span></button>
-        <nav class="mode-tabs" data-i18n-aria-label="navigation.label"><a href="/" id="edit-tab" data-i18n="navigation.edit"></a><a href="/view/" id="view-tab" data-i18n="navigation.view"></a></nav>
-      </div>
+      <nav class="mode-tabs" data-i18n-aria-label="navigation.label"><a href="/" id="edit-tab" data-i18n="navigation.edit"></a><a href="/view/" id="view-tab" data-i18n="navigation.view"></a></nav>
       <div class="mode-actions">
-        <span id="connection" class="connection" role="status" data-i18n="connection.initial"></span>
         <button id="highlight-screen" class="accent editor-only" type="button" disabled aria-pressed="false" data-i18n="highlight.start" data-i18n-title="highlight.description"></button>
       </div>
     </div>
