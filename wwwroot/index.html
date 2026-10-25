@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261023-crec-design">
+  <link rel="stylesheet" href="/app.css?v=20261025-viewer-controls">
   <script type="module" src="/app.js?v=20261022-settings-drawer"></script>
 </head>
 <body>
@@ -20,14 +20,13 @@
       <nav class="mode-tabs" data-i18n-aria-label="navigation.label"><a href="/" id="edit-tab" data-i18n="navigation.edit"></a><a href="/view/" id="view-tab" data-i18n="navigation.view"></a></nav>
       <div class="mode-actions">
         <button id="highlight-screen" class="accent editor-only" type="button" disabled aria-pressed="false" data-i18n="highlight.start" data-i18n-title="highlight.description"></button>
+        <span id="viewer-alarm-status" class="muted viewer-only"></span>
+        <div class="button-group viewer-only"><button id="flip-x" aria-pressed="false" data-i18n="viewer.flipX"></button><button id="flip-y" aria-pressed="false" data-i18n="viewer.flipY"></button><button id="fullscreen" data-i18n="viewer.fullscreen"></button></div>
       </div>
     </div>
     <div id="notice" class="notice" role="alert" hidden></div>
     <div class="toolbar editor-only">
       <div class="button-group"><button id="add-clock" disabled data-i18n="add.clock"></button><button id="add-text" disabled data-i18n="add.text"></button><button id="add-alarm" disabled data-i18n="add.alarm"></button><button id="add-image" disabled data-i18n="add.image"></button><button id="add-script" disabled data-i18n="add.script"></button><input id="image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden><input id="script-file" type="file" accept=".txt,text/plain" hidden></div>
-    </div>
-    <div class="toolbar viewer-only">
-      <span id="viewer-alarm-status" class="muted"></span><div class="button-group"><button id="flip-x" aria-pressed="false" data-i18n="viewer.flipX"></button><button id="flip-y" aria-pressed="false" data-i18n="viewer.flipY"></button><button id="fullscreen" data-i18n="viewer.fullscreen"></button></div>
     </div>
     <div class="workspace">
       <section class="elements-panel editor-only" data-i18n-aria-label="elements.title">
