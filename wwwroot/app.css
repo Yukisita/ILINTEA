@@ -92,6 +92,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .about-heading h2 { font-size: 20px; }
 .about-content { padding: 24px; font-size: 14px; line-height: 1.7; }
 .about-name { margin: 0 0 12px; font-size: 22px; font-weight: 700; }
+.about-full-name { margin: 0 0 16px; color: var(--muted); }
 #about-description { margin: 0 0 16px; }
 .about-note { margin: 0; padding: 12px; border-radius: var(--control-radius); background: var(--surface-muted); color: var(--muted); font-size: 13px; }
 .about-actions { display: flex; justify-content: end; margin: 0; padding: 16px 24px; border-top: 1px solid var(--border); }

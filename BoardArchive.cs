@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text.Json;
 
-namespace StreamPrompter;
+namespace ILINTEA;
 
 // The file contract is independent of live API snapshots and playback state.
 internal sealed record BoardConfiguration(string Format, int Version, SavedCanvas Canvas, SavedElement[] Elements);
@@ -21,7 +21,7 @@ public static class BoardArchive
     public const int CurrentVersion = 2;
     // Covers every permitted element, including JSON escaping of large scripts.
     public const long MaxArchiveBytes = BoardStore.MaxElements * UploadLimits.MaxRequestBodyBytes;
-    private const string Format = "StreamPrompter";
+    private const string Format = "ILINTEA";
     private const string ManifestName = "settings.json";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 

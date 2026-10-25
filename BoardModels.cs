@@ -1,4 +1,4 @@
-namespace StreamPrompter;
+namespace ILINTEA;
 
 public record Element(Guid Id, string Kind, double X, double Y, double Width, double Height,
     string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,

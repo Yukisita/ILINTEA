@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 
-namespace StreamPrompter;
+namespace ILINTEA;
 
 // One in-memory board: property patches are serialized so editing text does not overwrite another user's placement.
 public sealed class BoardStore(TimeProvider? timeProvider = null)

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace StreamPrompter;
+namespace ILINTEA;
 
 internal static class I18n
 {

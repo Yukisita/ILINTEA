@@ -3,7 +3,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Microsoft.AspNetCore.Http.Extensions;
 
-namespace StreamPrompter;
+namespace ILINTEA;
 
 internal static class ViewerLink
 {

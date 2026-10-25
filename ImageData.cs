@@ -1,4 +1,4 @@
-namespace StreamPrompter;
+namespace ILINTEA;
 
 public record ImageData(byte[] Bytes, string ContentType)
 {

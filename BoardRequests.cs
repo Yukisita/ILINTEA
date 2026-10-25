@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace StreamPrompter;
+namespace ILINTEA;
 
 public record ScriptControl(string Action, double? Speed)
 {

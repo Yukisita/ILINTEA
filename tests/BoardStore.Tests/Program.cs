@@ -1,4 +1,4 @@
-using StreamPrompter;
+using ILINTEA;
 
 var passed = 0;
 Run("Patches clamp element size and position to the canvas", () =>

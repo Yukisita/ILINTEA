@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace StreamPrompter;
+namespace ILINTEA;
 
 internal static class UploadLimits
 {

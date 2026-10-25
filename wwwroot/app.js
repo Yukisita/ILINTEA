@@ -4,8 +4,10 @@ import { bindFilePicker } from '/file-picker.js?v=20261013';
 import { connectBoardEvents } from '/board-connection.js?v=20261014';
 import { getAlarmState } from '/alarm-state.js?v=20261017';
 import { displayIsWaiting as isWaiting, elementIsVisible as isVisible } from '/display-state.js?v=20261017';
+import { preventSamePageNavigation } from '/navigation.js?v=20261026';
 
 await initializeI18n();
+preventSamePageNavigation(document.querySelectorAll('.brand, .mode-tabs a'));
 
 const $ = (id) => document.getElementById(id);
 const viewer = location.pathname.startsWith('/view');
@@ -740,7 +742,7 @@ async function downloadSettings() {
         const url = URL.createObjectURL(await response.blob());
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'StreamPrompter-settings.zip';
+        link.download = 'ILINTEA-settings.zip';
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) { notify(error.message); }

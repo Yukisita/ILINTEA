@@ -7,7 +7,7 @@ The archive contains UTF-8 `settings.json` and an `images/{elementId:N}` entry
 for each image element. Images retain their original bytes; MIME types are detected
 again during import. Entries are read in place and never extracted to disk paths.
 
-The JSON envelope has `format: "StreamPrompter"`, `version: 2`, `canvas`, and
+The JSON envelope has `format: "ILINTEA"`, `version: 2`, `canvas`, and
 `elements`. Canvas settings contain `aspectRatio` and `backgroundColor`.
 Elements contain their ID, kind, coordinates, dimensions, text, font size, color,
 alignment, visibility, `countdownText`, and script speed. For alarms, `countdownText`

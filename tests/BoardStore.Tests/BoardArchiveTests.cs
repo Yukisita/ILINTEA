@@ -1,7 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
-using StreamPrompter;
+using ILINTEA;
 
 internal static class BoardArchiveTests
 {
@@ -87,7 +87,7 @@ internal static class BoardArchiveTests
         // A fixed fixture protects the current contract independently of the exporter.
         const string version2 = """
             {
-              "format": "StreamPrompter", "version": 2,
+              "format": "ILINTEA", "version": 2,
               "canvas": {},
               "elements": [{
                 "id": "8e271f90-573e-470e-b3c2-e43dfe39cacf", "kind": "text",

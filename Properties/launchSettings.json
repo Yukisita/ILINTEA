@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "StreamPrompter": {
+    "ILINTEA": {
       "commandName": "Project",
       "launchBrowser": false,
       "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }

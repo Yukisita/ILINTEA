@@ -2,14 +2,14 @@ using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http.Features;
-using StreamPrompter;
+using ILINTEA;
 
 var starting = true;
 var builder = WebApplication.CreateBuilder(args);
-builder.Configuration.AddIniFile("StreamPrompter.ini", optional: false, reloadOnChange: false);
+builder.Configuration.AddIniFile("ILINTEA.ini", optional: false, reloadOnChange: false);
 I18n.SetLanguage(builder.Configuration["I18n:Language"]);
 if (!int.TryParse(builder.Configuration["Server:Port"], out var port) || port is < 1 or > 65535)
-    throw new InvalidOperationException("Invalid [Server] Port in StreamPrompter.ini. Expected 1-65535.");
+    throw new InvalidOperationException("Invalid [Server] Port in ILINTEA.ini. Expected 1-65535.");
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -41,7 +41,7 @@ app.MapGet("/api/settings/download", async (BoardStore board, CancellationToken 
     {
         await BoardArchive.WriteAsync(file, board, cancellationToken);
         file.Position = 0;
-        return Results.File(file, "application/zip", "StreamPrompter-settings.zip");
+        return Results.File(file, "application/zip", "ILINTEA-settings.zip");
     }
     catch
     {
@@ -173,7 +173,7 @@ app.MapGet("/view/", (IWebHostEnvironment environment) =>
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     starting = false;
-    Console.WriteLine("StreamPrompter");
+    Console.WriteLine("ILINTEA");
     Console.WriteLine($"  Local:   http://localhost:{port}/");
     if (ViewerLink.FindLanAddress() is { } address)
         Console.WriteLine($"  Network: http://{address}:{port}/");
@@ -188,7 +188,7 @@ try
 catch (Exception exception) when (starting && GetPortError(exception) is { } error)
 {
     Console.Error.WriteLine($"Error: Cannot listen on port {port}: {error}");
-    Console.Error.WriteLine("Stop the other app or change [Server] Port in StreamPrompter.ini.");
+    Console.Error.WriteLine("Stop the other app or change [Server] Port in ILINTEA.ini.");
     Environment.ExitCode = 1;
     if (!Console.IsInputRedirected)
     {
@@ -198,7 +198,7 @@ catch (Exception exception) when (starting && GetPortError(exception) is { } err
 }
 
 static FileStream CreateTemporaryFile() => new(
-    Path.Combine(Path.GetTempPath(), $"StreamPrompter-{Guid.NewGuid():N}.tmp"),
+    Path.Combine(Path.GetTempPath(), $"ILINTEA-{Guid.NewGuid():N}.tmp"),
     FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 81920,
     FileOptions.Asynchronous | FileOptions.DeleteOnClose);
 

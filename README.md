@@ -1,4 +1,6 @@
-# StreamPrompter
+# ILINTEA（イリンテア）
+
+**Integrated Live Information Terminal Application** の略称です。
 
 配信・収録のスタッフと出演者で画面を共有する、ブラウザー型のプロンプターです。スタッフが編集した原稿・時計・画像・通知を、出演者の閲覧画面へリアルタイムに反映します。
 
@@ -18,13 +20,13 @@
 .NET 10 SDKをインストールし、リポジトリのフォルダーで実行します。
 
 ```powershell
-dotnet run --project StreamPrompter.csproj
+dotnet run --project ILINTEA.csproj
 ```
 
 - 編集画面：<http://localhost:5280/>
 - 閲覧画面：<http://localhost:5280/view/>
 
-別端末で閲覧する場合は、編集画面の「閲覧URLをコピー」からURLを取得してください。ポートなどの設定は`StreamPrompter.ini`で変更できます。
+別端末で閲覧する場合は、編集画面の「閲覧URLをコピー」からURLを取得してください。ポートなどの設定は`ILINTEA.ini`で変更できます。
 
 ## 画面の強調
 
@@ -47,7 +49,7 @@ dotnet run --project StreamPrompter.csproj
 予約の解除はアラームも解除し、「予約を解除して表示」は終了日時を維持して即時表示します。
 
 設定ファイルには両方のメッセージを保存します。復元後のアラームは非表示・無効です。
-PoCのため旧形式の設定ファイルには対応していません。
+設定ファイルはILINTEAの形式バージョン2に対応しています。
 
 ## 利用上の注意
 
