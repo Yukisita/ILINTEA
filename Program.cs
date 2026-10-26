@@ -87,16 +87,20 @@ app.MapGet("/api/events", async (HttpContext context, BoardStore board) =>
 {
     context.Response.ContentType = "text/event-stream";
     context.Response.Headers.CacheControl = "no-cache";
+    // End long-lived streams when the server stops, as well as when a tab disconnects.
+    using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+        context.RequestAborted, app.Lifetime.ApplicationStopping);
+    var token = cancellation.Token;
     var subscription = board.Subscribe();
     try
     {
-        await foreach (var state in subscription.Reader.ReadAllAsync(context.RequestAborted))
+        await foreach (var state in subscription.Reader.ReadAllAsync(token))
         {
-            await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(state, json)}\n\n", context.RequestAborted);
-            await context.Response.Body.FlushAsync(context.RequestAborted);
+            await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(state, json)}\n\n", token);
+            await context.Response.Body.FlushAsync(token);
         }
     }
-    catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
+    catch (OperationCanceledException) when (token.IsCancellationRequested) { }
     finally { board.Unsubscribe(subscription.Id); }
 });
 
