@@ -93,8 +93,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .about-content { display: grid; grid-template-columns: minmax(0, 280px) minmax(0, 1fr); align-items: center; gap: 24px; padding: 24px; font-size: 14px; line-height: 1.7; }
 .about-illustration { display: block; width: 100%; height: auto; }
 .about-copy { min-width: 0; }
-.about-name { margin: 0 0 12px; font-size: 22px; font-weight: 700; }
+.about-name { margin: 0 0 12px; font-size: 22px; font-weight: 700; white-space: pre-line; }
 .about-full-name { margin: 0 0 16px; color: var(--muted); }
+.about-license { margin: 0; font-size: 13px; color: var(--muted); }
 .about-actions { display: flex; justify-content: end; margin: 0; padding: 16px 24px; border-top: 1px solid var(--border); }
 .about-actions button { min-width: 88px; }
 @media (max-width: 600px) {
