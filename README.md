@@ -28,6 +28,13 @@ dotnet run --project ILINTEA.csproj
 
 別端末で閲覧する場合は、編集画面の「閲覧URLをコピー」からURLを取得してください。ポートなどの設定は`ILINTEA.ini`で変更できます。
 
+Visual Studioなどで通常ビルドした場合も、`bin/Debug/`または
+`bin/Release/`の直下に実行ファイル・`ILINTEA.ini`・`wwwroot/`が揃います。
+実行ファイルを直接起動する場合は、このフォルダーの内容を一式で配置してください。
+設定と画面データは、起動時の作業フォルダーにかかわらず実行ファイルのフォルダーから読み込みます。
+実行先には.NET 10のASP.NET Core Runtimeが必要です。
+両構成をビルド後、`./tests/VerifyBuildOutput.ps1`で必要なファイルの配置とWebファイルの一致を確認できます。
+
 ## 画面の強調
 
 編集画面上部の「画面を強調」で、すべての閲覧画面とProgramの枠を5秒間ゆっくり点滅させます。

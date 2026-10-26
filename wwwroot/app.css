@@ -86,17 +86,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .settings-section button { width: 100%; }
 .settings-actions { display: grid; gap: 8px; }
 @keyframes settings-slide-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-.about-dialog { width: min(500px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); box-shadow: 0 8px 16px #00000026; }
+.about-dialog { width: min(760px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); box-shadow: 0 8px 16px #00000026; }
 .about-dialog::backdrop { background: #0008; }
 .about-heading { padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--accent); color: #fff; }
 .about-heading h2 { font-size: 20px; }
-.about-content { padding: 24px; font-size: 14px; line-height: 1.7; }
+.about-content { display: grid; grid-template-columns: minmax(0, 280px) minmax(0, 1fr); align-items: center; gap: 24px; padding: 24px; font-size: 14px; line-height: 1.7; }
+.about-illustration { display: block; width: 100%; height: auto; }
+.about-copy { min-width: 0; }
 .about-name { margin: 0 0 12px; font-size: 22px; font-weight: 700; }
 .about-full-name { margin: 0 0 16px; color: var(--muted); }
-#about-description { margin: 0 0 16px; }
-.about-note { margin: 0; padding: 12px; border-radius: var(--control-radius); background: var(--surface-muted); color: var(--muted); font-size: 13px; }
 .about-actions { display: flex; justify-content: end; margin: 0; padding: 16px 24px; border-top: 1px solid var(--border); }
 .about-actions button { min-width: 88px; }
+@media (max-width: 600px) {
+  .about-content { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .about-illustration { width: min(240px, 100%); justify-self: center; }
+}
 main { padding: 24px 16px; margin: auto; }
 .mode-bar, .toolbar, .mode-actions, .button-group { display: flex; align-items: center; gap: 8px; }
 .mode-bar { justify-content: space-between; margin-bottom: 18px; gap: 16px; flex-wrap: wrap; }

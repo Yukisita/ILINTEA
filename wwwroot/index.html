@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261025-viewer-controls">
+  <link rel="stylesheet" href="/app.css?v=20261026-about-character">
   <script type="module" src="/app.js?v=20261026-navigation"></script>
 </head>
 <body>
@@ -131,13 +131,14 @@
       </section>
     </div>
   </dialog>
-  <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title" aria-describedby="about-description">
+  <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title">
     <header class="about-heading"><h2 id="about-title" data-i18n="about.title"></h2></header>
     <div class="about-content">
-      <p class="about-name" data-i18n="about.name"></p>
-      <p class="about-full-name" data-i18n="about.fullName"></p>
-      <p id="about-description" data-i18n="about.description"></p>
-      <p class="about-note" data-i18n="about.status"></p>
+      <img class="about-illustration" src="/images/about-character.png" width="1254" height="1254" loading="lazy" decoding="async" alt="" data-i18n-alt="about.illustrationAlt">
+      <div class="about-copy">
+        <p class="about-name" data-i18n="about.name"></p>
+        <p class="about-full-name" data-i18n="about.fullName"></p>
+      </div>
     </div>
     <form method="dialog" class="about-actions"><button class="primary" type="submit" autofocus data-i18n="about.close"></button></form>
   </dialog>

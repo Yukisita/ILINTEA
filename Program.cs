@@ -5,7 +5,12 @@ using Microsoft.AspNetCore.Http.Features;
 using ILINTEA;
 
 var starting = true;
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory,
+    WebRootPath = "wwwroot"
+});
 builder.Configuration.AddIniFile("ILINTEA.ini", optional: false, reloadOnChange: false);
 I18n.SetLanguage(builder.Configuration["I18n:Language"]);
 if (!int.TryParse(builder.Configuration["Server:Port"], out var port) || port is < 1 or > 65535)
@@ -16,7 +21,8 @@ builder.Logging.AddConsole();
 builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
 // Report expected port conflicts below; retain normal host diagnostics once running.
-builder.Logging.AddFilter("Microsoft.Extensions.Hosting.Internal.Host", level => !starting || level >= LogLevel.Critical);
+builder.Logging.AddFilter("Microsoft.Extensions.Hosting.Internal.Host",
+    level => level >= LogLevel.Information && (!starting || level >= LogLevel.Critical));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<BoardStore>();
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = UploadLimits.MaxFileBytes);
