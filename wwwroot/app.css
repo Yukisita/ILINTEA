@@ -123,7 +123,7 @@ main { padding: 24px 16px; margin: auto; }
 .canvas-settings label { white-space: nowrap; }
 .canvas-settings input[type="color"] { width: 100%; }
 .muted { color: var(--muted); font-size: 13px; }
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "canvas properties" "elements properties"; gap: 20px; align-items: start; }
+.workspace { display: grid; grid-template-columns: clamp(220px, 28vw, 300px) minmax(0, 1fr); grid-template-areas: "properties canvas" "properties elements"; gap: 12px; align-items: start; }
 .canvas-column { grid-area: canvas; min-width: 0; }
 .elements-panel { grid-area: elements; min-width: 0; }
 .properties { grid-area: properties; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -227,22 +227,20 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid var(--border); 
 .stage-host:fullscreen { width: 100vw; height: 100dvh; padding: 0; border: 0; border-radius: 0; background: #000; }
 .stage-host:fullscreen .fullscreen-exit { display: block; position: absolute; top: 14px; right: 14px; opacity: 0; transition: opacity .2s; }
 .stage-host:fullscreen .fullscreen-exit:hover, .stage-host:fullscreen .fullscreen-exit:focus-visible { opacity: 1; }
-/* Keep the display action at the bottom while settings can scroll. */
-@media (min-width: 721px) {
-  body:not(.viewer) { height: 100dvh; display: flex; flex-direction: column; }
-  body:not(.viewer) .navbar, body:not(.viewer) .mode-bar, body:not(.viewer) .toolbar { flex: none; }
-  body:not(.viewer) main { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; }
-  body:not(.viewer) .workspace { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr) auto; align-items: stretch; }
-  body:not(.viewer) .canvas-column { min-height: 0; display: flex; flex-direction: column; }
-  body:not(.viewer) .monitor-grid { flex: 1; min-height: 0; }
-  body:not(.viewer) .monitor { min-height: 0; display: flex; flex-direction: column; }
-  body:not(.viewer) .monitor .stage-host { --fit-stage-height: 1; flex: 1; min-height: 0; }
-  body:not(.viewer) .elements-panel { max-height: 30dvh; overflow-y: auto; }
-  body:not(.viewer) .notice { position: fixed; z-index: 200; top: 58px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); box-shadow: 0 3px 12px #0002; }
-  .monitor-heading { flex: none; }
-}
+/* Keep settings beside both monitors, even when the window is narrow or short. */
+body:not(.viewer) { height: 100dvh; display: flex; flex-direction: column; }
+body:not(.viewer) .navbar, body:not(.viewer) .mode-bar, body:not(.viewer) .toolbar { flex: none; }
+body:not(.viewer) main { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; overflow: auto; }
+body:not(.viewer) .workspace { flex: 1; min-width: 640px; min-height: 320px; grid-template-rows: minmax(0, 1fr) auto; align-items: stretch; }
+body:not(.viewer) .canvas-column { min-height: 0; display: flex; flex-direction: column; }
+body:not(.viewer) .monitor-grid { flex: 1; min-height: 0; }
+body:not(.viewer) .monitor { min-height: 0; display: flex; flex-direction: column; }
+body:not(.viewer) .monitor .stage-host { --fit-stage-height: 1; flex: 1; min-height: 0; }
+body:not(.viewer) .elements-panel { max-height: 30dvh; overflow-y: auto; }
+body:not(.viewer) .notice { position: fixed; z-index: 200; top: 58px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); box-shadow: 0 3px 12px #0002; }
+.monitor-heading { flex: none; }
 /* Use three columns and compact list controls on larger desktop displays. */
-@media (min-width: 1200px) and (min-height: 900px) {
+@media (min-width: 1200px) {
   body:not(.viewer) main { max-width: none; padding: 12px 16px; }
   body:not(.viewer) .mode-bar { flex: none; margin-bottom: 10px; }
   body:not(.viewer) .toolbar { flex: none; padding: 8px 12px; margin-bottom: 12px; }
@@ -269,7 +267,6 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid var(--border); 
   .delete-actions { margin-top: 10px; padding-top: 10px; }
 }
 @media (max-width: 960px) {
-  .workspace { grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; }
   main { padding: 16px; }
   .stage-host { padding: 12px; }
   .monitor-heading { align-items: start; flex-direction: column; gap: 4px; }
@@ -277,7 +274,6 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid var(--border); 
 @media (max-width: 720px) {
   :root { --control-height: 44px; --compact-height: 36px; }
   main { padding: 12px; }
-  .workspace { grid-template-columns: 1fr; grid-template-areas: "canvas" "elements" "properties"; }
   .mode-bar { gap: 12px; }
   .toolbar { padding: 12px; }
   .stage-host { padding: 8px; }
