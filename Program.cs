@@ -33,6 +33,11 @@ var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+app.MapGet("/LICENSE", () => Results.File(
+    Path.Combine(app.Environment.ContentRootPath, "LICENSE"), "text/plain; charset=utf-8"));
+app.MapGet("/THIRD-PARTY-NOTICES.txt", () => Results.File(
+    Path.Combine(app.Environment.ContentRootPath, "THIRD-PARTY-NOTICES.txt"), "text/plain; charset=utf-8"));
+
 app.MapGet("/api/board", (BoardStore board) => board.Snapshot());
 app.MapPost("/api/highlight", (BoardStore board) => board.HighlightScreen());
 app.MapDelete("/api/highlight/{id:guid}", (Guid id, BoardStore board) =>

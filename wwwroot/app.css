@@ -1,4 +1,7 @@
-/* Match CREC Web's Bootstrap palette and control variants. */
+/* Palette and control styling values reference Bootstrap 5.3.0 (MIT).
+ * Copyright (c) 2011-2023 The Bootstrap Authors.
+ * Full notice: THIRD-PARTY-NOTICES.txt.
+ */
 :root {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
   font-synthesis: none;
@@ -96,6 +99,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .about-name { margin: 0 0 12px; font-size: 22px; font-weight: 700; white-space: pre-line; }
 .about-full-name { margin: 0 0 16px; color: var(--muted); }
 .about-license { margin: 0; font-size: 13px; color: var(--muted); }
+.about-license a { color: var(--accent); }
 .about-actions { display: flex; justify-content: end; margin: 0; padding: 16px 24px; border-top: 1px solid var(--border); }
 .about-actions button { min-width: 88px; }
 @media (max-width: 600px) {

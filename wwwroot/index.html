@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261027-responsive-workspace">
+  <link rel="stylesheet" href="/app.css?v=20261027-license-notices">
   <script type="module" src="/app.js?v=20261026-navigation"></script>
 </head>
 <body>
@@ -138,7 +138,11 @@
       <div class="about-copy">
         <p class="about-name" data-i18n="about.name"></p>
         <p class="about-full-name" data-i18n="about.fullName"></p>
-        <p class="about-license" data-i18n="about.license"></p>
+        <p class="about-license" lang="en">
+          <a href="/LICENSE" target="_blank" rel="noopener" data-i18n="about.license"></a><br>
+          <span data-i18n="about.copyright"></span><br>
+          <a href="/THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener" data-i18n="about.thirdPartyNotices"></a>
+        </p>
       </div>
     </div>
     <form method="dialog" class="about-actions"><button class="primary" type="submit" autofocus data-i18n="about.close"></button></form>

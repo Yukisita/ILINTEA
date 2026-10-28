@@ -32,7 +32,14 @@ Visual Studioなどで通常ビルドした場合も、`bin/Debug/`または
 `bin/Release/`の直下に実行ファイル・`ILINTEA.ini`・`wwwroot/`が揃います。
 実行ファイルを直接起動する場合は、このフォルダーの内容を一式で配置してください。
 設定と画面データは、起動時の作業フォルダーにかかわらず実行ファイルのフォルダーから読み込みます。
-実行先には.NET 10のASP.NET Core Runtimeが必要です。
+実行先には、.NET 10の次の共有ランタイムが必要です。
+
+- .NET Runtime 10.x（`Microsoft.NETCore.App`）
+- ASP.NET Core Runtime 10.x（`Microsoft.AspNetCore.App`）
+
+[Microsoftの公式ダウンロードページ](https://dotnet.microsoft.com/download/dotnet/10.0)から導入できます。
+Windowsの単体インストーラーでは、この2つを用意してください。.NET 10 SDKが導入済みなら、両方含まれています。
+
 両構成をビルド後、`./tests/VerifyBuildOutput.ps1`で必要なファイルの配置とWebファイルの一致を確認できます。
 
 ## 画面の強調
@@ -62,3 +69,26 @@ Visual Studioなどで通常ビルドした場合も、`bin/Debug/`または
 
 - 画面の内容はメモリー内だけに保持され、サーバーを停止・再起動すると失われます。
 - 認証・権限管理は未実装です。信頼できるLAN内で利用し、インターネットへ直接公開しないでください。
+
+## ライセンス
+
+ILINTEAは[MIT License](LICENSE)で提供します。
+Copyright (c) 2026 S.Yukisita
+
+第三者由来のライセンスと著作権表示は[THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)に収録しています。
+現行のWindows x64版について、同梱するコードとデザインの参照元を区別しています。
+
+| 区分 | 対象 | 取り扱い |
+| --- | --- | --- |
+| 配布に含む | .NET apphost 10.0.13 | `ILINTEA.exe`の起動部分。MITライセンス全文を同梱 |
+| デザインの参照元 | Bootstrap 5.3.0 | 配色・スタイル値の参考。MIT表記を保持。Bootstrap本体やアイコン・フォントは同梱しない |
+
+追加のNuGetパッケージや外部JavaScriptライブラリの同梱はありません。
+
+アプリ情報から、このアプリのMITライセンス全文と第三者のライセンス表示を開けます。
+`LICENSE`と`THIRD-PARTY-NOTICES.txt`は通常ビルド・`dotnet publish`の出力に自動で含まれます。
+再配布する際は、この2ファイルも同梱してください。
+
+依存関係、SDKの起動用ホスト、配布方式を変更した場合は、実際に同梱する内容に合わせて表示を更新してください。
+Windows版.NETの一部バイナリにはMIT以外の条件もあるため、ランタイムを同梱する配布へ変更する場合は
+[MicrosoftのWindows版.NETライセンス情報](https://github.com/dotnet/core/blob/main/license-information-windows.md)も確認してください。

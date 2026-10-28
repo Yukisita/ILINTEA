@@ -5,6 +5,8 @@
   "about.name": "ILINTEA\nイリンテア",
   "about.fullName": "Integrated Live Information Terminal Application",
   "about.license": "This application is released under the MIT License.",
+  "about.copyright": "Copyright (c) 2026 S.Yukisita",
+  "about.thirdPartyNotices": "Third-party notices",
   "about.illustrationAlt": "マイクとノートパソコンを使い、足を揃えて座って配信する雪下雪菜のイラスト",
   "about.close": "閉じる",
   "page.title": "{mode} - ILINTEA",
