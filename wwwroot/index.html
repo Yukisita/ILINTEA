@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261027-license-notices">
-  <script type="module" src="/app.js?v=20261026-navigation"></script>
+  <link rel="stylesheet" href="/app.css?v=20261028-clock-display">
+  <script type="module" src="/app.js?v=20261028-clock-display"></script>
 </head>
 <body>
   <header class="navbar">
@@ -83,6 +83,11 @@
               <label><span data-i18n="position.x"></span><input id="x" type="number" min="0" max="1200"></label><label><span data-i18n="position.y"></span><input id="y" type="number" min="0" max="672"></label>
               <label><span data-i18n="position.width"></span><input id="width" type="number" min="80" max="1280"></label><label><span data-i18n="position.height"></span><input id="height" type="number" min="48" max="720"></label>
             </div>
+            <section id="clock-settings" aria-labelledby="clock-settings-title" hidden>
+              <h3 id="clock-settings-title" data-i18n="clock.displaySettings"></h3>
+              <label for="clock-hour-format"><span data-i18n="clock.hourFormat"></span><select id="clock-hour-format"><option value="24" data-i18n="clock.hour24"></option><option value="12" data-i18n="clock.hour12"></option></select></label>
+              <label for="clock-show-seconds"><span data-i18n="clock.precision"></span><select id="clock-show-seconds"><option value="true" data-i18n="clock.withSeconds"></option><option value="false" data-i18n="clock.withoutSeconds"></option></select></label>
+            </section>
             <div class="delete-actions"><button id="delete-element" class="danger" type="button" data-i18n="delete.button"></button><div id="delete-confirmation" hidden><span data-i18n="delete.confirmation"></span><button id="confirm-delete" class="danger primary" type="button" data-i18n="delete.confirm"></button><button id="cancel-delete" type="button" data-i18n="delete.cancel"></button></div></div>
           </div>
           <section class="display-panel" aria-labelledby="display-heading">

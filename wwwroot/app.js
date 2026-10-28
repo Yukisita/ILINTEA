@@ -5,6 +5,7 @@ import { connectBoardEvents } from '/board-connection.js?v=20261014';
 import { getAlarmState } from '/alarm-state.js?v=20261017';
 import { displayIsWaiting as isWaiting, elementIsVisible as isVisible } from '/display-state.js?v=20261017';
 import { preventSamePageNavigation } from '/navigation.js?v=20261026';
+import { createClockFormatter } from '/clock-format.js?v=20261028';
 
 await initializeI18n();
 preventSamePageNavigation(document.querySelectorAll('.brand, .mode-tabs a'));
@@ -51,7 +52,7 @@ const scriptLimits = new Map();
 const programScriptLimits = new Map();
 const kinds = { text: 'kind.text', clock: 'kind.clock', image: 'kind.image', script: 'kind.script', alarm: 'kind.alarm' };
 const maxFileBytes = 1024 ** 3;
-const fields = { text: 'text', 'countdown-text': 'countdownText', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height' };
+const fields = { text: 'text', 'countdown-text': 'countdownText', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height', 'clock-hour-format': 'clockHourFormat', 'clock-show-seconds': 'clockShowSeconds' };
 let flipX = false;
 let flipY = false;
 try {
@@ -329,6 +330,7 @@ function renderProperties() {
     $('script-fields').hidden = element.kind !== 'script';
     $('script-file-fields').hidden = element.kind !== 'script';
     $('image-fields').hidden = element.kind !== 'image';
+    $('clock-settings').hidden = element.kind !== 'clock';
     $('replace-image').disabled = !connected || settingsBusy || imageBusy;
     $('type-fields').hidden = element.kind === 'image';
     for (const [id, property] of Object.entries(fields)) {
@@ -622,13 +624,13 @@ function resizeStage() {
     if (!viewer) fitStage('program-host', 'program-viewport', 'program-stage', true);
 }
 
-let clockFormatter = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+let formatClock = createClockFormatter(locale);
 function updateClocks() {
-    const time = clockFormatter.format(new Date(Date.now() + serverOffset));
+    const time = new Date(Date.now() + serverOffset);
     for (const element of state.elements) {
         if (element.kind === 'clock') {
-            nodes.get(element.id).firstElementChild.textContent = time;
-            if (!viewer) programNodes.get(element.id).firstElementChild.textContent = time;
+            nodes.get(element.id).firstElementChild.textContent = formatClock(viewer ? element : effectiveElement(element), time);
+            if (!viewer) programNodes.get(element.id).firstElementChild.textContent = formatClock(element, time);
         }
     }
     renderAlarm();
@@ -908,10 +910,11 @@ if (!viewer) {
         const update = (event) => {
             if (!selectedId || event.isComposing) return;
             let value = input.value;
-            if (input.type === 'number') {
+            if (input.type === 'number' || property === 'clockHourFormat') {
                 if (input.value === '' || !input.checkValidity()) { input.reportValidity(); return; }
                 value = Number(value);
             }
+            if (property === 'clockShowSeconds') value = value === 'true';
             queuePatch(selectedId, { [property]: value });
         };
         input.addEventListener(input.tagName === 'TEXTAREA' || input.type === 'color' ? 'input' : 'change', update);
@@ -985,7 +988,7 @@ $('language').addEventListener('change', async (event) => {
         await changeLanguage(select.value);
         document.title = t('page.title', { mode: t(viewer ? 'navigation.view' : 'navigation.edit') });
         if (viewer) document.querySelector('.preview-monitor').setAttribute('aria-label', t('monitor.viewerLabel'));
-        clockFormatter = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+        formatClock = createClockFormatter(locale);
         render();
     } catch { notify(t('errors.language')); }
     finally { select.value = locale; select.disabled = false; }

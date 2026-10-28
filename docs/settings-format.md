@@ -14,6 +14,10 @@ alignment, visibility, `countdownText`, and script speed. For alarms, `countdown
 is the counting message and `text` is the finished message. Array order is the
 layer order, from front to back. Text includes the imported TXT contents.
 
+Clock display settings are stored in the optional `clockHourFormat` (12 or 24,
+default 24) and `clockShowSeconds` (boolean, default true) fields. Archives that
+omit them retain the previous 24-hour display with hours, minutes and seconds.
+
 Live timestamps, revisions, image URLs, script scroll position, display schedules,
 alarm deadlines, and transient screen highlights are excluded. Pending displays
 are saved hidden; already displayed elements retain their visibility. Scripts

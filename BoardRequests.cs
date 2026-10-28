@@ -20,7 +20,8 @@ public record CanvasPatch(string? AspectRatio, string? BackgroundColor)
 }
 
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
-    int? FontSize, string? Color, string? Align, bool? Visible, string? CountdownText = null)
+    int? FontSize, string? Color, string? Align, bool? Visible, string? CountdownText = null,
+    int? ClockHourFormat = null, bool? ClockShowSeconds = null)
 {
     public bool IsValid() =>
         new[] { X, Y, Width, Height }.All(value => value is null || double.IsFinite(value.Value)) &&
@@ -28,7 +29,8 @@ public record ElementPatch(double? X, double? Y, double? Width, double? Height, 
         (CountdownText is null || UploadLimits.TextFits(CountdownText)) &&
         (FontSize is null or >= 12 and <= 160) &&
         PatchValidation.IsColorValid(Color) &&
-        (Align is null or "left" or "center" or "right");
+        (Align is null or "left" or "center" or "right") &&
+        (ClockHourFormat is null or 12 or 24);
 }
 
 internal static class PatchValidation

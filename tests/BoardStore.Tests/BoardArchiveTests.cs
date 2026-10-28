@@ -15,7 +15,9 @@ internal static class BoardArchiveTests
             source.UpdateCanvas(new("9:16", "#123456"));
             var text = source.Add("text")!;
             source.Update(text.Id, new(45, 90, 500, 150, "保存\n\"text\" 🌟", 80, "#abcdef", "center", true));
-            source.Add("clock");
+            var time = source.Add("clock")!;
+            source.Update(time.Id, new(null, null, null, null, null, null, null, null, null,
+                ClockHourFormat: 12, ClockShowSeconds: false));
             var image = source.Add("image", new([137, 80, 78, 71, 13, 10, 26, 10, 1], "image/png"))!;
             source.ReplaceImage(image.Id, new([255, 216, 255, 42], "image/jpeg"));
             source.Update(image.Id, new(source.Snapshot().Canvas.Width - 135.1,
@@ -118,6 +120,16 @@ internal static class BoardArchiveTests
             Equal(1, (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Length);
         });
 
+        await Run("Older clock settings retain 24-hour display with seconds", async () =>
+        {
+            var json = JsonNode.Parse(version2)!.AsObject();
+            json["elements"]![0]!["kind"] = "clock";
+            using var archive = new MemoryStream(CreateArchive(json.ToJsonString()));
+            var element = (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Single();
+            Equal(24, element.ClockHourFormat);
+            Assert(element.ClockShowSeconds, "Older clock settings lost their seconds");
+        });
+
         await Run("Saving a counting alarm preserves both messages without changing the live alarm", async () =>
         {
             var clock = new ManualTimeProvider();
@@ -194,6 +206,8 @@ internal static class BoardArchiveTests
                 json => json["elements"]![0]!["x"] = 9000,
                 json => json["elements"]![0]!["color"] = "#123456\n",
                 json => json["elements"]![0]!["scriptSpeed"] = 201,
+                json => json["elements"]![0]!["clockHourFormat"] = 13,
+                json => json["elements"]![0]!["clockShowSeconds"] = "false",
                 json => json["elements"]![0]!["kind"] = "script"
             ];
             foreach (var corrupt in corruptions)

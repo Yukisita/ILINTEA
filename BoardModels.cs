@@ -3,7 +3,8 @@ namespace ILINTEA;
 public record Element(Guid Id, string Kind, double X, double Y, double Width, double Height,
     string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
     ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null, string CountdownText = "",
-    long ImageRevision = 0, AlarmSchedule? AlarmSchedule = null)
+    long ImageRevision = 0, AlarmSchedule? AlarmSchedule = null,
+    int ClockHourFormat = 24, bool ClockShowSeconds = true)
 {
     public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}?v={ImageRevision}" : null;
 }

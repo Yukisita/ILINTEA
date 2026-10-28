@@ -25,6 +25,32 @@ Run("Partial patches retain placement and unrelated properties", () =>
     Equal(original with { Text = "updated" }, updated);
 });
 
+Run("Clock display settings default to 24-hour with seconds and remain independent per element", () =>
+{
+    var board = new BoardStore();
+    var first = board.Add("clock")!;
+    var second = board.Add("clock")!;
+    Equal(24, first.ClockHourFormat);
+    Assert(first.ClockShowSeconds, "New clock hides seconds");
+    var updated = board.Update(first.Id, Patch() with { ClockHourFormat = 12, ClockShowSeconds = false })!;
+    Equal(first with { ClockHourFormat = 12, ClockShowSeconds = false }, updated);
+    Equal(second, board.Snapshot().Elements.Single(element => element.Id == second.Id));
+    updated = board.Update(first.Id, Patch(x: 100))!;
+    Equal(12, updated.ClockHourFormat);
+    Assert(!updated.ClockShowSeconds, "Unrelated edit reset the clock display");
+    updated = board.Update(first.Id, Patch() with { ClockShowSeconds = true })!;
+    Equal(12, updated.ClockHourFormat);
+    Assert(updated.ClockShowSeconds, "Seconds could not be re-enabled");
+});
+
+Run("Clock hour format validation accepts only 12 or 24", () =>
+{
+    foreach (var format in new int?[] { null, 12, 24 })
+        Assert((Patch() with { ClockHourFormat = format }).IsValid(), "Valid hour format rejected");
+    foreach (var format in new[] { -1, 0, 11, 13, 23, 25, int.MaxValue })
+        Assert(!(Patch() with { ClockHourFormat = format }).IsValid(), "Invalid hour format accepted");
+});
+
 Run("Aspect ratio changes scale position and size proportionally", () =>
 {
     var board = new BoardStore();

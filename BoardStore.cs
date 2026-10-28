@@ -142,6 +142,8 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 Align = patch.Align ?? current.Align,
                 Visible = patch.Visible ?? current.Visible,
                 CountdownText = patch.CountdownText ?? current.CountdownText,
+                ClockHourFormat = patch.ClockHourFormat ?? current.ClockHourFormat,
+                ClockShowSeconds = patch.ClockShowSeconds ?? current.ClockShowSeconds,
                 Playback = playback,
                 // Showing an alarm must retain its deadline; hiding it disarms it immediately.
                 DisplaySchedule = patch.Visible is not null ? null : current.DisplaySchedule,
