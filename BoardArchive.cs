@@ -91,8 +91,7 @@ public static class BoardArchive
                 || saved.Width < 80 || saved.Height < 48 || saved.X < 0 || saved.Y < 0
                 || saved.Width > canvas.Width || saved.Height > canvas.Height
                 || saved.X > canvas.Width - saved.Width || saved.Y > canvas.Height - saved.Height
-                || !double.IsFinite(saved.ScriptSpeed) || saved.ScriptSpeed is < 5 or > 200
-                || (saved.Kind == "script" && string.IsNullOrWhiteSpace(saved.Text)))
+                || !double.IsFinite(saved.ScriptSpeed) || saved.ScriptSpeed is < 5 or > 200)
                 throw new BoardArchiveException("errors.settingsFileFormat");
             elements.Add(new(saved.Id, saved.Kind, saved.X, saved.Y, saved.Width, saved.Height,
                 saved.Text, saved.FontSize, saved.Color, saved.Align, saved.Kind != "alarm" && saved.Visible,

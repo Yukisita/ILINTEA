@@ -65,6 +65,30 @@ internal static class BoardArchiveTests
             target.Unsubscribe(subscription.Id);
         });
 
+        await Run("Scripts cleared to empty or whitespace round-trip without losing the rest of the board", async () =>
+        {
+            foreach (var blank in new[] { "", " \t\r\n" })
+            {
+                var source = new BoardStore();
+                source.UpdateCanvas(new("4:3", "#123456"));
+                var text = source.Add("text")!;
+                source.Update(text.Id, new(null, null, null, null, "Keep this text", null, null, null, true));
+                var script = source.Add("script", text: "Original script")!;
+                source.ControlScript(script.Id, new("speed", 75));
+                source.Update(script.Id, new(null, null, null, null, blank, null, null, null, true));
+                var original = source.Snapshot();
+                var target = new BoardStore();
+                target.Add("clock");
+                using var archive = new MemoryStream(await SaveAsync(source));
+                var restored = await BoardArchive.RestoreAsync(archive, target);
+                Equal(original.Canvas, restored.Canvas);
+                Equal(original.Elements.Length, restored.Elements.Length);
+                for (var i = 0; i < original.Elements.Length; i++)
+                    Equal(original.Elements[i] with { Id = restored.Elements[i].Id }, restored.Elements[i]);
+                Assert(original.Elements.SequenceEqual(source.Snapshot().Elements), "Saving changed the live board");
+            }
+        });
+
         await Run("Screen highlights are not saved or restored and saving leaves the live highlight unchanged", async () =>
         {
             var clock = new ManualTimeProvider();
@@ -207,8 +231,7 @@ internal static class BoardArchiveTests
                 json => json["elements"]![0]!["color"] = "#123456\n",
                 json => json["elements"]![0]!["scriptSpeed"] = 201,
                 json => json["elements"]![0]!["clockHourFormat"] = 13,
-                json => json["elements"]![0]!["clockShowSeconds"] = "false",
-                json => json["elements"]![0]!["kind"] = "script"
+                json => json["elements"]![0]!["clockShowSeconds"] = "false"
             ];
             foreach (var corrupt in corruptions)
             {

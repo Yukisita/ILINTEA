@@ -13,6 +13,8 @@ Elements contain their ID, kind, coordinates, dimensions, text, font size, color
 alignment, visibility, `countdownText`, and script speed. For alarms, `countdownText`
 is the counting message and `text` is the finished message. Array order is the
 layer order, from front to back. Text includes the imported TXT contents.
+Script text cleared during editing may be empty or whitespace-only; saving and
+restoring preserves it exactly.
 
 Clock display settings are stored in the optional `clockHourFormat` (12 or 24,
 default 24) and `clockShowSeconds` (boolean, default true) fields. Archives that
