@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { connectBoardEvents } from '../wwwroot/board-connection.js';
 
-function setup() {
+function setup(failures = 0) {
     const page = new EventTarget();
     const sources = [];
     const received = [];
+    const timers = new Map();
+    let timerId = 0;
     let disconnects = 0;
     connectBoardEvents({
         onOpen: event => received.push({ type: 'open', event }),
@@ -13,13 +15,26 @@ function setup() {
         onDisconnect: () => { disconnects++; }
     }, {
         page,
-        createSource: () => {
+        createSocket: () => {
+            if (failures-- > 0) throw new Error('Connection unavailable');
             const source = { closed: false, close() { this.closed = true; } };
             sources.push(source);
             return source;
-        }
+        },
+        scheduleReconnect: callback => { timers.set(++timerId, callback); return timerId; },
+        cancelReconnect: id => timers.delete(id)
     });
-    return { page, sources, received, get disconnects() { return disconnects; } };
+    return {
+        page, sources, received,
+        get disconnects() { return disconnects; },
+        get retries() { return timers.size; },
+        retry() {
+            assert.equal(timers.size, 1);
+            const [id, callback] = timers.entries().next().value;
+            timers.delete(id);
+            callback();
+        }
+    };
 }
 
 test('initial pageshow keeps the single connection and forwards its events', () => {
@@ -74,27 +89,79 @@ test('late events from a closed connection cannot change the restored page', () 
     context.page.dispatchEvent(new Event('pagehide'));
     previous.onopen('late open');
     previous.onmessage('late snapshot');
-    previous.onerror();
+    previous.onclose();
     context.page.dispatchEvent(new Event('pageshow'));
     previous.onopen('stale open');
     previous.onmessage('stale snapshot');
-    previous.onerror();
+    previous.onclose();
     assert.deepEqual(context.received, []);
     assert.equal(context.disconnects, 1);
 });
 
-test('network errors leave automatic EventSource reconnection intact', () => {
+test('a closed socket schedules one replacement and accepts a new server snapshot', () => {
     const context = setup();
     const source = context.sources[0];
-    source.onerror();
+    source.onclose();
+    source.onclose();
     assert.equal(context.disconnects, 1);
-    assert.equal(source.closed, false);
-    source.onopen('reconnected');
-    source.onmessage('latest snapshot');
+    assert.equal(context.retries, 1);
     assert.equal(context.sources.length, 1);
+    context.retry();
+    assert.equal(context.sources.length, 2);
+    context.sources[1].onopen('reconnected');
+    context.sources[1].onmessage('latest snapshot');
     assert.deepEqual(context.received, [
         { type: 'open', event: 'reconnected' }, { type: 'message', event: 'latest snapshot' }
     ]);
+});
+
+test('leaving a page cancels a pending retry and restoring it connects immediately', () => {
+    const context = setup();
+    context.sources[0].onclose();
+    assert.equal(context.retries, 1);
+    context.page.dispatchEvent(new Event('pagehide'));
+    assert.equal(context.retries, 0);
+    context.page.dispatchEvent(new Event('pageshow'));
+    assert.equal(context.sources.length, 2);
+    assert.equal(context.retries, 0);
+    context.sources[0].onclose();
+    assert.equal(context.retries, 0);
+});
+
+test('a failed socket constructor is retried without leaving a stale connection', () => {
+    const context = setup(1);
+    assert.equal(context.disconnects, 1);
+    assert.equal(context.sources.length, 0);
+    assert.equal(context.retries, 1);
+    context.retry();
+    assert.equal(context.sources.length, 1);
+    assert.equal(context.retries, 0);
+    context.sources[0].onopen('connected');
+    assert.deepEqual(context.received, [{ type: 'open', event: 'connected' }]);
+});
+
+test('socket URLs retain the server host and port and use the matching secure protocol', () => {
+    const original = globalThis.WebSocket;
+    const urls = [];
+    globalThis.WebSocket = class {
+        constructor(url) { urls.push(url); }
+        close() {}
+    };
+    try {
+        for (const href of ['http://192.168.10.10:5280/view/?lang=en', 'https://example.test:8443/', 'http://[::1]:5280/']) {
+            const page = Object.assign(new EventTarget(), { location: { href } });
+            connectBoardEvents({ onOpen() {}, onMessage() {}, onDisconnect() {} }, { page });
+            page.dispatchEvent(new Event('pagehide'));
+        }
+        assert.deepEqual(urls, [
+            'ws://192.168.10.10:5280/api/events',
+            'wss://example.test:8443/api/events',
+            'ws://[::1]:5280/api/events'
+        ]);
+    } finally {
+        if (original === undefined) delete globalThis.WebSocket;
+        else globalThis.WebSocket = original;
+    }
 });
 
 test('canceling navigation does not close the current connection', () => {

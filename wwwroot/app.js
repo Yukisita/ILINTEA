@@ -1,7 +1,7 @@
 import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage } from '/i18n.js?v=20261010-language';
 import { createEditSync } from '/edit-sync.js?v=20261014-await-edits';
 import { bindFilePicker } from '/file-picker.js?v=20261013';
-import { connectBoardEvents } from '/board-connection.js?v=20261014';
+import { connectBoardEvents } from '/board-connection.js?v=20261028-websocket';
 import { getAlarmState } from '/alarm-state.js?v=20261017';
 import { displayIsWaiting as isWaiting, elementIsVisible as isVisible } from '/display-state.js?v=20261017';
 import { preventSamePageNavigation } from '/navigation.js?v=20261026';

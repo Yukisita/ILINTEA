@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Text.Json;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Http.Features;
@@ -32,6 +33,11 @@ var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseWebSockets(new WebSocketOptions
+{
+    KeepAliveInterval = TimeSpan.FromSeconds(30),
+    KeepAliveTimeout = TimeSpan.FromSeconds(30)
+});
 
 app.MapGet("/LICENSE", () => Results.File(
     Path.Combine(app.Environment.ContentRootPath, "LICENSE"), "text/plain; charset=utf-8"));
@@ -88,25 +94,49 @@ app.MapGet("/api/viewer-url", (HttpRequest request) =>
         ? Results.Json(I18n.Error("errors.lanAddress"), statusCode: 503)
         : Results.Ok(new { url });
 });
-app.MapGet("/api/events", async (HttpContext context, BoardStore board) =>
+app.Map("/api/events", async (HttpContext context, BoardStore board) =>
 {
-    context.Response.ContentType = "text/event-stream";
-    context.Response.Headers.CacheControl = "no-cache";
-    // End long-lived streams when the server stops, as well as when a tab disconnects.
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        return;
+    }
+    if (context.Request.Headers.Origin.Count > 0 && !string.Equals(
+        context.Request.Headers.Origin.ToString(), $"{context.Request.Scheme}://{context.Request.Host}",
+        StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
+    using var socket = await context.WebSockets.AcceptWebSocketAsync();
     using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
         context.RequestAborted, app.Lifetime.ApplicationStopping);
     var token = cancellation.Token;
     var subscription = board.Subscribe();
+    var receiving = WaitForSocketCloseAsync(socket, cancellation);
     try
     {
         await foreach (var state in subscription.Reader.ReadAllAsync(token))
         {
-            await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(state, json)}\n\n", token);
-            await context.Response.Body.FlushAsync(token);
+            var message = JsonSerializer.SerializeToUtf8Bytes(state, json);
+            await socket.SendAsync(message.AsMemory(), WebSocketMessageType.Text, true, token);
         }
     }
     catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-    finally { board.Unsubscribe(subscription.Id); }
+    catch (WebSocketException) { }
+    finally
+    {
+        board.Unsubscribe(subscription.Id);
+        cancellation.Cancel();
+        await receiving;
+        if (socket.State == WebSocketState.CloseReceived)
+        {
+            using var closing = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            try { await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, null, closing.Token); }
+            catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
+            catch (WebSocketException) { }
+        }
+    }
 });
 
 app.MapPost("/api/elements", (CreateElement request, BoardStore board) =>
@@ -210,6 +240,23 @@ catch (Exception exception) when (starting && GetPortError(exception) is { } err
         Console.WriteLine("Press Enter to exit.");
         Console.ReadLine();
     }
+}
+
+// A receive must stay active to observe close frames and keep-alive responses, even on an idle board.
+static async Task WaitForSocketCloseAsync(WebSocket socket, CancellationTokenSource cancellation)
+{
+    try
+    {
+        var buffer = new byte[256];
+        while (true)
+        {
+            var message = await socket.ReceiveAsync(buffer.AsMemory(), cancellation.Token);
+            if (message.MessageType == WebSocketMessageType.Close) return;
+        }
+    }
+    catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+    catch (WebSocketException) { }
+    finally { cancellation.Cancel(); }
 }
 
 static FileStream CreateTemporaryFile() => new(
