@@ -143,7 +143,7 @@
   "settings.restored": "設定を復元しました。原稿の再生は停止し、表示予約とアラームは解除しました。",
   "errors.settingsFileFormat": "設定ファイルの形式または内容が正しくありません。ILINTEAからダウンロードしたZIPファイルを選んでください。",
   "errors.settingsFileVersion": "この設定ファイルのバージョンには対応していません。対応するバージョンのILINTEAで開いてください。",
-  "errors.settingsFileSize": "設定ファイルまたは含まれる画像がサイズの上限を超えています。画像は1枚1GB以下にしてください。",
+  "errors.settingsFileSize": "設定ファイルまたは含まれる画像・TXT原稿がサイズの上限を超えています。画像・TXT原稿は1件1GB以下にしてください。",
   "errors.request": "操作を反映できませんでした。もう一度お試しください。",
   "errors.canvas": "画面比率は選択肢から、背景色は#に続く6桁の色コードで指定してください。",
   "errors.lanAddress": "共有できるIPアドレスが見つかりません。Wi-Fiまたは有線LANの接続を確認してください。",

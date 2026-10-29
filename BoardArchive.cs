@@ -1,5 +1,7 @@
 using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ILINTEA;
 
@@ -7,9 +9,11 @@ namespace ILINTEA;
 internal sealed record BoardConfiguration(string Format, int Version, SavedCanvas Canvas, SavedElement[] Elements);
 internal sealed record SavedCanvas(string AspectRatio = "16:9", string BackgroundColor = "#000000");
 internal sealed record SavedElement(Guid Id, string Kind, double X, double Y, double Width, double Height,
-    string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Text = "",
+    int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = false,
     string CountdownText = "", double ScriptSpeed = 30,
-    int ClockHourFormat = 24, bool ClockShowSeconds = true);
+    int ClockHourFormat = 24, bool ClockShowSeconds = true,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ScriptFile = null);
 internal sealed record BoardBackupState(CanvasSettings Canvas, Element[] Elements, Dictionary<Guid, ImageData> Images);
 
 public sealed class BoardArchiveException(string errorKey) : Exception(errorKey)
@@ -19,14 +23,15 @@ public sealed class BoardArchiveException(string errorKey) : Exception(errorKey)
 
 public static class BoardArchive
 {
-    public const int CurrentVersion = 2;
-    // Covers every permitted element, including JSON escaping of large scripts.
+    public const int CurrentVersion = 3;
+    // Allows room for file entries and JSON metadata in an uploaded settings ZIP.
     public const long MaxArchiveBytes = BoardStore.MaxElements * UploadLimits.MaxRequestBodyBytes;
-    // Applies only to the uncompressed settings.json, not to image entries.
+    // Applies only to the uncompressed settings.json, not to image or script entries.
     public const long MaxManifestBytes = 512L * 1024 * 1024;
     private const string Format = "ILINTEA";
     private const string ManifestName = "settings.json";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     public static async Task WriteAsync(Stream destination, BoardStore board, CancellationToken cancellationToken = default)
     {
@@ -34,10 +39,11 @@ public static class BoardArchive
         var configuration = new BoardConfiguration(Format, CurrentVersion,
             new(backup.Canvas.AspectRatio, backup.Canvas.BackgroundColor),
             backup.Elements.Select(element => new SavedElement(element.Id, element.Kind,
-                element.X, element.Y, element.Width, element.Height, element.Text, element.FontSize,
+                element.X, element.Y, element.Width, element.Height, element.Kind == "script" ? null : element.Text, element.FontSize,
                 element.Color, element.Align, element.Visible,
                 element.CountdownText, element.Playback?.Speed ?? 30,
-                element.ClockHourFormat, element.ClockShowSeconds)).ToArray());
+                element.ClockHourFormat, element.ClockShowSeconds,
+                element.Kind == "script" ? ScriptName(element.Id) : null)).ToArray());
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: true);
         await using (var manifest = archive.CreateEntry(ManifestName, CompressionLevel.Optimal).Open())
             await JsonSerializer.SerializeAsync(manifest, configuration, Json, cancellationToken);
@@ -45,6 +51,14 @@ public static class BoardArchive
         {
             await using var entry = archive.CreateEntry(ImageName(element.Id), CompressionLevel.NoCompression).Open();
             await entry.WriteAsync(backup.Images[element.Id].Bytes, cancellationToken);
+        }
+        foreach (var element in backup.Elements.Where(element => element.Kind == "script"))
+        {
+            // Encode directly into the ZIP instead of allocating a second copy of the entire script.
+            await using var entry = archive.CreateEntry(ScriptName(element.Id), CompressionLevel.Optimal).Open();
+            await using var writer = new StreamWriter(entry, Utf8, bufferSize: 16 * 1024, leaveOpen: true);
+            await writer.WriteAsync(element.Text.AsMemory(), cancellationToken);
+            await writer.FlushAsync(cancellationToken);
         }
     }
 
@@ -58,14 +72,14 @@ public static class BoardArchive
             if (manifest.Length > MaxManifestBytes) throw new BoardArchiveException("errors.settingsFileSize");
             // Check the count before the serializer allocates the element array or its strings.
             await ValidateManifestAsync(manifest, cancellationToken);
-            await using var manifestStream = new ManifestReadStream(manifest.Open(), manifest.Length);
+            await using var manifestStream = new EntryReadStream(manifest.Open(), manifest.Length);
             var configuration = await JsonSerializer.DeserializeAsync<BoardConfiguration>(manifestStream, Json, cancellationToken)
                 ?? throw new BoardArchiveException("errors.settingsFileFormat");
             if (configuration.Format != Format) throw new BoardArchiveException("errors.settingsFileFormat");
             if (configuration.Version != CurrentVersion) throw new BoardArchiveException("errors.settingsFileVersion");
             backup = await ReadConfigurationAsync(archive, configuration, cancellationToken);
         }
-        catch (Exception exception) when (exception is InvalidDataException or JsonException or EndOfStreamException)
+        catch (Exception exception) when (exception is InvalidDataException or JsonException or EndOfStreamException or DecoderFallbackException)
         {
             throw new BoardArchiveException("errors.settingsFileFormat");
         }
@@ -75,7 +89,7 @@ public static class BoardArchive
 
     private static async Task ValidateManifestAsync(ZipArchiveEntry manifest, CancellationToken cancellationToken)
     {
-        await using var stream = new ManifestReadStream(manifest.Open(), manifest.Length);
+        await using var stream = new EntryReadStream(manifest.Open(), manifest.Length);
         var buffer = new byte[(int)Math.Min(16 * 1024, manifest.Length + 1)];
         var buffered = 0;
         var firstBlock = true;
@@ -149,9 +163,10 @@ public static class BoardArchive
     }
 
     // Enforce the actual decompressed byte count too, even if ZIP metadata understates it.
-    private sealed class ManifestReadStream(Stream inner, long limit) : Stream
+    private sealed class EntryReadStream(Stream inner, long limit) : Stream
     {
         private long remaining = limit;
+        public long Remaining => remaining;
         public override bool CanRead => inner.CanRead;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
@@ -196,7 +211,10 @@ public static class BoardArchive
         {
             if (saved is null || saved.Id == Guid.Empty || !ids.Add(saved.Id)
                 || saved.Kind is not ("text" or "clock" or "image" or "script" or "alarm")
-                || saved.Text is null || saved.CountdownText is null || saved.Color is null || saved.Align is null
+                || saved.CountdownText is null || saved.Color is null || saved.Align is null
+                || (saved.Kind == "script"
+                    ? saved.ScriptFile != ScriptName(saved.Id) || !string.IsNullOrEmpty(saved.Text)
+                    : saved.ScriptFile is not null || saved.Text is null)
                 || !new ElementPatch(saved.X, saved.Y, saved.Width, saved.Height, saved.Text,
                     saved.FontSize, saved.Color, saved.Align, saved.Visible, saved.CountdownText,
                     saved.ClockHourFormat, saved.ClockShowSeconds).IsValid()
@@ -205,8 +223,10 @@ public static class BoardArchive
                 || saved.X > canvas.Width - saved.Width || saved.Y > canvas.Height - saved.Height
                 || !double.IsFinite(saved.ScriptSpeed) || saved.ScriptSpeed is < 5 or > 200)
                 throw new BoardArchiveException("errors.settingsFileFormat");
+            var text = saved.ScriptFile is not null
+                ? await ReadScriptAsync(archive, saved.ScriptFile, cancellationToken) : saved.Text!;
             elements.Add(new(saved.Id, saved.Kind, saved.X, saved.Y, saved.Width, saved.Height,
-                saved.Text, saved.FontSize, saved.Color, saved.Align, saved.Kind != "alarm" && saved.Visible,
+                text, saved.FontSize, saved.Color, saved.Align, saved.Kind != "alarm" && saved.Visible,
                 saved.Kind == "script" ? new(Speed: saved.ScriptSpeed) : null,
                 CountdownText: saved.CountdownText,
                 ClockHourFormat: saved.ClockHourFormat, ClockShowSeconds: saved.ClockShowSeconds));
@@ -224,7 +244,21 @@ public static class BoardArchive
         return new(canvas, elements.ToArray(), images);
     }
 
+    private static async Task<string> ReadScriptAsync(ZipArchive archive, string name, CancellationToken cancellationToken)
+    {
+        var entry = SingleEntry(archive, name);
+        if (entry.Length > UploadLimits.MaxFileBytes)
+            throw new BoardArchiveException("errors.settingsFileSize");
+        await using var stream = new EntryReadStream(entry.Open(), entry.Length);
+        // Keep every character, including an edited leading U+FEFF, and reject invalid UTF-8.
+        using var reader = new StreamReader(stream, Utf8, detectEncodingFromByteOrderMarks: false, bufferSize: 16 * 1024);
+        var text = await reader.ReadToEndAsync(cancellationToken);
+        if (stream.Remaining != 0) throw new EndOfStreamException();
+        return text;
+    }
+
     private static string ImageName(Guid id) => $"images/{id:N}";
+    private static string ScriptName(Guid id) => $"scripts/{id:N}.txt";
 
     private static ZipArchiveEntry SingleEntry(ZipArchive archive, string name)
     {

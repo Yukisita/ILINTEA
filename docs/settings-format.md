@@ -3,30 +3,39 @@
 `GET /api/settings/download` downloads a ZIP file. `POST /api/settings/upload`
 accepts the ZIP bytes as the request body and returns the restored board snapshot.
 
-The archive contains UTF-8 `settings.json` and an `images/{elementId:N}` entry
-for each image element. Images retain their original bytes; MIME types are detected
-again during import. Entries are read in place and never extracted to disk paths.
+The archive contains UTF-8 `settings.json`, an `images/{elementId:N}` entry
+for each image element, and a `scripts/{elementId:N}.txt` entry for each TXT script.
+Images retain their original bytes; MIME types are detected again during import.
+Scripts contain the currently edited text encoded as UTF-8, without adding a BOM.
+Entries are read in place and never extracted to disk paths.
 
 On import, the uncompressed `settings.json` is limited to 512 MiB (536,870,912
-bytes), independently of the image entries and the ZIP upload limit. Both the ZIP
+bytes), independently of the image/script entries and the ZIP upload limit. Both the ZIP
 entry's declared length and the actual decompressed byte count are checked. A
 streaming validation pass rejects more than 20 elements before deserializing the
-configuration. Size and count errors leave the current board unchanged. Archives
-whose JSON exceeds this limit cannot be restored, including archives exported
-from boards with exceptionally large scripts.
+configuration. Size and count errors leave the current board unchanged. Script
+bodies are outside the JSON and do not count toward this manifest limit.
 
-The JSON envelope has `format: "ILINTEA"`, `version: 2`, `canvas`, and
+The JSON envelope has `format: "ILINTEA"`, `version: 3`, `canvas`, and
 `elements`. Canvas settings contain `aspectRatio` and `backgroundColor`.
 Elements contain their ID, kind, coordinates, dimensions, text, font size, color,
 alignment, visibility, `countdownText`, and script speed. For alarms, `countdownText`
 is the counting message and `text` is the finished message. Array order is the
-layer order, from front to back. Text includes the imported TXT contents.
+layer order, from front to back.
+
+Script elements omit `text` when saving and instead specify
+`scriptFile: "scripts/{elementId:N}.txt"`. The reference must match the element's
+ID and identify exactly one ZIP entry. Nonempty inline script text, missing or
+duplicate entries, and invalid UTF-8 are rejected. Other element kinds cannot
+specify `scriptFile`. Each script entry is limited to 1 GiB (1,073,741,824 bytes),
+checked against both its declared length and the bytes actually read. Encoding
+and decoding use buffered streams instead of a separate full-size byte array.
 Script text cleared during editing may be empty or whitespace-only; saving and
-restoring preserves it exactly.
+restoring preserves all characters, including line endings and a leading U+FEFF.
 
 Clock display settings are stored in the optional `clockHourFormat` (12 or 24,
 default 24) and `clockShowSeconds` (boolean, default true) fields. Archives that
-omit them retain the previous 24-hour display with hours, minutes and seconds.
+omit them use 24-hour display with hours, minutes and seconds.
 
 Live timestamps, revisions, image URLs, script scroll position, display schedules,
 alarm deadlines, and transient screen highlights are excluded. Pending displays

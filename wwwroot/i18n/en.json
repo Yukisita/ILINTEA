@@ -143,7 +143,7 @@
   "settings.restored": "Settings restored. Script playback is stopped, display schedules are cleared, and alarms are disabled.",
   "errors.settingsFileFormat": "The settings file is invalid. Choose a ZIP file downloaded from ILINTEA.",
   "errors.settingsFileVersion": "This settings file version is not supported. Open it with a compatible version of ILINTEA.",
-  "errors.settingsFileSize": "The settings file or an included image exceeds the size limit. Each image must be 1GB or less.",
+  "errors.settingsFileSize": "The settings file or an included image or TXT script exceeds the size limit. Each image and TXT script must be 1GB or less.",
   "errors.request": "Could not apply the change. Please try again.",
   "errors.canvas": "Choose an available aspect ratio and a background color with # followed by six hexadecimal digits.",
   "errors.lanAddress": "No shareable IP address found. Check your Wi-Fi or wired LAN connection.",

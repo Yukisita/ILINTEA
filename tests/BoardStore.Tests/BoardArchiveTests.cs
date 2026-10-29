@@ -90,6 +90,50 @@ internal static class BoardArchiveTests
             }
         });
 
+        await Run("Edited scripts are separate UTF-8 files referenced from the version 3 manifest", async () =>
+        {
+            var source = new BoardStore();
+            var caption = source.Add("text")!;
+            source.Update(caption.Id, new(null, null, null, null, "Keep caption inline", null, null, null, null));
+            var contents = new[] { "原稿\r\n\"quoted\" 🌟\t\0end", "", " \t\r\n", "\uFEFFLeading character" };
+            foreach (var content in contents)
+            {
+                var script = source.Add("script", text: "Before editing")!;
+                source.Update(script.Id, new(null, null, null, null, content, null, null, null, null));
+            }
+            var bytes = await SaveAsync(source);
+            using (var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read))
+            {
+                using var manifestReader = new StreamReader(zip.GetEntry("settings.json")!.Open());
+                var manifest = JsonNode.Parse(await manifestReader.ReadToEndAsync())!;
+                Equal(3, manifest["version"]!.GetValue<int>());
+                foreach (var saved in manifest["elements"]!.AsArray())
+                {
+                    if (saved!["kind"]!.GetValue<string>() != "script")
+                    {
+                        Equal("Keep caption inline", saved["text"]!.GetValue<string>());
+                        Assert(!saved.AsObject().ContainsKey("scriptFile"), "Caption references a script file");
+                        continue;
+                    }
+                    Assert(!saved.AsObject().ContainsKey("text"), "Script body is still embedded in JSON");
+                    var id = saved["id"]!.GetValue<Guid>();
+                    var name = saved["scriptFile"]!.GetValue<string>();
+                    Equal($"scripts/{id:N}.txt", name);
+                    using var entry = zip.GetEntry(name)!.Open();
+                    using var actual = new MemoryStream();
+                    await entry.CopyToAsync(actual);
+                    var expected = source.Snapshot().Elements.Single(element => element.Id == id).Text;
+                    Assert(actual.ToArray().SequenceEqual(new UTF8Encoding(false, true).GetBytes(expected)),
+                        "Saved script differs from edited contents");
+                }
+                Equal(contents.Length + 1, zip.Entries.Count);
+            }
+            using var archive = new MemoryStream(bytes);
+            var restored = await BoardArchive.RestoreAsync(archive, new BoardStore());
+            Assert(source.Snapshot().Elements.Select(element => element.Text)
+                .SequenceEqual(restored.Elements.Select(element => element.Text)), "Script text changed during restore");
+        });
+
         await Run("Screen highlights are not saved or restored and saving leaves the live highlight unchanged", async () =>
         {
             var clock = new ManualTimeProvider();
@@ -112,9 +156,9 @@ internal static class BoardArchiveTests
         });
 
         // A fixed fixture protects the current contract independently of the exporter.
-        const string version2 = """
+        const string version3 = """
             {
-              "format": "ILINTEA", "version": 2,
+              "format": "ILINTEA", "version": 3,
               "canvas": {},
               "elements": [{
                 "id": "8e271f90-573e-470e-b3c2-e43dfe39cacf", "kind": "text",
@@ -125,7 +169,7 @@ internal static class BoardArchiveTests
         await Run("Current settings files use defaults for omitted optional fields", async () =>
         {
             var target = new BoardStore();
-            using var archive = new MemoryStream(CreateArchive(version2));
+            using var archive = new MemoryStream(CreateArchive(version3));
             var restored = await BoardArchive.RestoreAsync(archive, target);
             Equal(new CanvasSettings(), restored.Canvas);
             var element = restored.Elements.Single();
@@ -136,9 +180,82 @@ internal static class BoardArchiveTests
             Assert(!element.Visible && element.CountdownText == "", "Optional fields lost their defaults");
         });
 
+        await Run("Twenty large scripts do not enlarge the JSON manifest with their contents", async () =>
+        {
+            var source = new BoardStore();
+            var content = new string('あ', 64 * 1024) + "\n🌟";
+            for (var index = 0; index < BoardStore.MaxElements; index++) source.Add("script", text: content);
+            using var bytes = new MemoryStream(await SaveAsync(source));
+            using (var zip = new ZipArchive(bytes, ZipArchiveMode.Read, leaveOpen: true))
+            {
+                Assert(zip.GetEntry("settings.json")!.Length < 20 * 1024, "Script contents enlarged the manifest");
+                Equal(BoardStore.MaxElements, zip.Entries.Count(entry => entry.FullName.StartsWith("scripts/")));
+            }
+            bytes.Position = 0;
+            var restored = await BoardArchive.RestoreAsync(bytes, new BoardStore());
+            Equal(BoardStore.MaxElements, restored.Elements.Length);
+            Assert(restored.Elements.All(element => element.Text == content), "Large script contents changed");
+        });
+
+        var scriptManifest = JsonNode.Parse(version3)!.AsObject();
+        scriptManifest["elements"]![0]!["kind"] = "script";
+        const string scriptName = "scripts/8e271f90573e470eb3c2e43dfe39cacf.txt";
+        scriptManifest["elements"]![0]!["scriptFile"] = scriptName;
+        await Run("Missing, duplicate and invalid script files never replace the current board", async () =>
+        {
+            var json = scriptManifest.ToJsonString();
+            await RejectUnchangedAsync(CreateArchive(json), "errors.settingsFileFormat");
+            await RejectUnchangedAsync(CreateArchive(json,
+                [(scriptName, "first"u8.ToArray()), (scriptName, "duplicate"u8.ToArray())]), "errors.settingsFileFormat");
+            foreach (var invalid in new byte[][] { [0xc3, 0x28], [0xff, 0xfe, 0x61, 0x00], [0xe3, 0x81] })
+                await RejectUnchangedAsync(CreateArchive(json, scriptName, invalid), "errors.settingsFileFormat");
+
+            var second = scriptManifest.DeepClone();
+            var missing = second["elements"]![0]!.DeepClone();
+            var missingId = Guid.NewGuid();
+            missing["id"] = missingId;
+            missing["scriptFile"] = $"scripts/{missingId:N}.txt";
+            second["elements"]!.AsArray().Add(missing);
+            await RejectUnchangedAsync(CreateArchive(second.ToJsonString(), scriptName, "valid first script"u8.ToArray()),
+                "errors.settingsFileFormat");
+        });
+
+        await Run("Script references must match the element ID and cannot conflict with inline contents", async () =>
+        {
+            Action<JsonNode>[] corruptions = [
+                json => json["elements"]![0]!.AsObject().Remove("scriptFile"),
+                json => json["elements"]![0]!["scriptFile"] = "../script.txt",
+                json => json["elements"]![0]!["scriptFile"] = $"scripts/{Guid.NewGuid():N}.txt",
+                json => json["elements"]![0]!["text"] = "conflicting body",
+                json => json["elements"]![0]!["kind"] = "text"
+            ];
+            foreach (var corrupt in corruptions)
+            {
+                var json = scriptManifest.DeepClone();
+                corrupt(json);
+                await RejectUnchangedAsync(CreateArchive(json.ToJsonString(), scriptName, "body"u8.ToArray()),
+                    "errors.settingsFileFormat");
+            }
+        });
+
+        await Run("Script sizes are checked before allocation and against the actual decompressed bytes", async () =>
+        {
+            var json = scriptManifest.ToJsonString();
+            var bytes = "test body"u8.ToArray();
+            await RejectUnchangedAsync(WithEntryLength(CreateArchive(json, scriptName, bytes), scriptName,
+                1024L * 1024 * 1024 + 1), "errors.settingsFileSize");
+            await RejectUnchangedAsync(WithEntryLength(CreateArchive(json, scriptName, bytes,
+                CompressionLevel.NoCompression), scriptName, 1), "errors.settingsFileSize");
+            await RejectUnchangedAsync(WithEntryLength(CreateArchive(json, scriptName, bytes,
+                CompressionLevel.NoCompression), scriptName, bytes.Length + 1), "errors.settingsFileFormat");
+            // A permitted declared size must not cause an allocation of that size for a tiny entry.
+            await RejectUnchangedAsync(WithEntryLength(CreateArchive(json, scriptName, bytes,
+                CompressionLevel.NoCompression), scriptName, 1024L * 1024 * 1024), "errors.settingsFileFormat");
+        });
+
         await Run("Extra JSON fields and archive entries are ignored", async () =>
         {
-            var json = JsonNode.Parse(version2)!.AsObject();
+            var json = JsonNode.Parse(version3)!.AsObject();
             json["futureSetting"] = new JsonObject { ["enabled"] = true };
             json["elements"]![0]!["futureElementSetting"] = "value";
             using var archive = new MemoryStream(CreateArchive(json.ToJsonString(), "../unused.txt", "ignored"u8.ToArray()));
@@ -163,15 +280,15 @@ internal static class BoardArchiveTests
 
         await Run("Understated ZIP lengths cannot bypass the decompressed byte limit", async () =>
         {
-            await RejectUnchangedAsync(WithManifestLength(CreateArchive(version2,
+            await RejectUnchangedAsync(WithManifestLength(CreateArchive(version3,
                 compression: CompressionLevel.NoCompression), 16), "errors.settingsFileSize");
             // .NET's deflate reader independently rejects an inconsistent uncompressed size.
-            await RejectUnchangedAsync(WithManifestLength(CreateArchive(version2), 16), "errors.settingsFileFormat");
+            await RejectUnchangedAsync(WithManifestLength(CreateArchive(version3), 16), "errors.settingsFileFormat");
         });
 
         await Run("Twenty elements and long split tokens restore while nested future arrays are ignored", async () =>
         {
-            var json = JsonNode.Parse(version2)!.AsObject();
+            var json = JsonNode.Parse(version3)!.AsObject();
             var template = json["elements"]![0]!;
             json["elements"] = new JsonArray(Enumerable.Range(0, BoardStore.MaxElements).Select(_ =>
             {
@@ -194,7 +311,7 @@ internal static class BoardArchiveTests
 
         await Run("The twenty-first element is rejected before its large body is read", async () =>
         {
-            var json = JsonNode.Parse(version2)!.AsObject();
+            var json = JsonNode.Parse(version3)!.AsObject();
             var template = json["elements"]![0]!;
             json["elements"] = new JsonArray(Enumerable.Range(0, BoardStore.MaxElements + 1).Select(_ =>
             {
@@ -214,19 +331,19 @@ internal static class BoardArchiveTests
 
         await Run("Streaming validation preserves UTF-8 BOM support across one-byte reads", async () =>
         {
-            using var archive = new ArchiveReadStream(CreateArchive("\uFEFF" + version2,
+            using var archive = new ArchiveReadStream(CreateArchive("\uFEFF" + version3,
                 compression: CompressionLevel.NoCompression), maxReadBytes: 1);
             Equal(1, (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Length);
         });
 
-        await Run("Older clock settings retain 24-hour display with seconds", async () =>
+        await Run("Omitted clock settings default to 24-hour display with seconds", async () =>
         {
-            var json = JsonNode.Parse(version2)!.AsObject();
+            var json = JsonNode.Parse(version3)!.AsObject();
             json["elements"]![0]!["kind"] = "clock";
             using var archive = new MemoryStream(CreateArchive(json.ToJsonString()));
             var element = (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Single();
             Equal(24, element.ClockHourFormat);
-            Assert(element.ClockShowSeconds, "Older clock settings lost their seconds");
+            Assert(element.ClockShowSeconds, "Default clock settings lost their seconds");
         });
 
         await Run("Saving a counting alarm preserves both messages without changing the live alarm", async () =>
@@ -264,7 +381,7 @@ internal static class BoardArchiveTests
 
         await Run("Restoring even a visible alarm in the manifest leaves it disarmed", async () =>
         {
-            var json = JsonNode.Parse(version2)!.AsObject();
+            var json = JsonNode.Parse(version3)!.AsObject();
             json["elements"]![0]!["kind"] = "alarm";
             json["elements"]![0]!["visible"] = true;
             json["elements"]![0]!["text"] = "finished";
@@ -278,9 +395,9 @@ internal static class BoardArchiveTests
 
         await Run("Unsupported versions are rejected without changing the board", async () =>
         {
-            foreach (var version in new[] { 0, 1, 3, int.MaxValue })
+            foreach (var version in new[] { 0, 1, 2, BoardArchive.CurrentVersion + 1, int.MaxValue })
             {
-                var json = JsonNode.Parse(version2)!.AsObject();
+                var json = JsonNode.Parse(version3)!.AsObject();
                 json["version"] = version;
                 await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileVersion");
             }
@@ -310,7 +427,7 @@ internal static class BoardArchiveTests
             ];
             foreach (var corrupt in corruptions)
             {
-                var json = JsonNode.Parse(version2)!.AsObject();
+                var json = JsonNode.Parse(version3)!.AsObject();
                 corrupt(json);
                 await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileFormat");
             }
@@ -318,7 +435,7 @@ internal static class BoardArchiveTests
 
         await Run("Missing and corrupt image entries are rejected before replacing any settings", async () =>
         {
-            var json = JsonNode.Parse(version2)!.AsObject();
+            var json = JsonNode.Parse(version3)!.AsObject();
             json["elements"]![0]!["kind"] = "image";
             await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileFormat");
             var name = "images/8e271f90573e470eb3c2e43dfe39cacf";
@@ -335,7 +452,7 @@ internal static class BoardArchiveTests
             await RejectUnchangedAsync(CreateArchive("null"), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive("{\"\\uD800\":0}"), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive("{\"\\uDC00\":0}"), "errors.settingsFileFormat");
-            await RejectUnchangedAsync(CreateArchive(version2, "settings.json", Encoding.UTF8.GetBytes(version2)), "errors.settingsFileFormat");
+            await RejectUnchangedAsync(CreateArchive(version3, "settings.json", Encoding.UTF8.GetBytes(version3)), "errors.settingsFileFormat");
         });
 
         await Run("Empty boards can be saved and restored", async () =>
@@ -353,7 +470,7 @@ internal static class BoardArchiveTests
             var target = new BoardStore(new ManualTimeProvider());
             target.Add("text");
             var before = target.Snapshot();
-            using var archive = new MemoryStream(CreateArchive(version2));
+            using var archive = new MemoryStream(CreateArchive(version3));
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
             try
@@ -383,6 +500,10 @@ internal static class BoardArchiveTests
     }
 
     private static byte[] CreateArchive(string json, string? extraName = null, byte[]? extraBytes = null,
+        CompressionLevel compression = CompressionLevel.Optimal) =>
+        CreateArchive(json, extraName is null ? [] : [(extraName, extraBytes!)], compression);
+
+    private static byte[] CreateArchive(string json, (string Name, byte[] Bytes)[] extraEntries,
         CompressionLevel compression = CompressionLevel.Optimal)
     {
         using var stream = new MemoryStream();
@@ -390,22 +511,34 @@ internal static class BoardArchiveTests
         {
             using (var writer = new StreamWriter(archive.CreateEntry("settings.json", compression).Open(), new UTF8Encoding(false)))
                 writer.Write(json);
-            if (extraName is not null)
+            foreach (var extra in extraEntries)
             {
-                using var entry = archive.CreateEntry(extraName).Open();
-                entry.Write(extraBytes!);
+                using var entry = archive.CreateEntry(extra.Name, compression).Open();
+                entry.Write(extra.Bytes);
             }
         }
         return stream.ToArray();
     }
 
-    private static byte[] WithManifestLength(byte[] bytes, long length)
+    private static byte[] WithManifestLength(byte[] bytes, long length) => WithEntryLength(bytes, "settings.json", length);
+
+    private static byte[] WithEntryLength(byte[] bytes, string name, long length)
     {
         var directory = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(bytes.Length - 22 + 16)));
-        Equal(0x02014b50u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(directory)));
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(directory + 24), checked((uint)length));
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(22), checked((uint)length));
-        return bytes;
+        while (BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(directory)) == 0x02014b50u)
+        {
+            var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(directory + 28));
+            if (Encoding.UTF8.GetString(bytes.AsSpan(directory + 46, nameLength)) == name)
+            {
+                var local = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(directory + 42)));
+                BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(directory + 24), checked((uint)length));
+                BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(local + 22), checked((uint)length));
+                return bytes;
+            }
+            directory += 46 + nameLength + BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(directory + 30))
+                + BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(directory + 32));
+        }
+        throw new InvalidOperationException($"Entry not found: {name}");
     }
 
     private sealed class ArchiveReadStream(byte[] bytes, int maxReadBytes = int.MaxValue) : MemoryStream(bytes)
