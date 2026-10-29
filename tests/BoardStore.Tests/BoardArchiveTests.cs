@@ -90,7 +90,7 @@ internal static class BoardArchiveTests
             }
         });
 
-        await Run("Edited scripts are separate UTF-8 files referenced from the version 3 manifest", async () =>
+        await Run("Edited scripts are separate UTF-8 files referenced from the version 1 manifest", async () =>
         {
             var source = new BoardStore();
             var caption = source.Add("text")!;
@@ -106,7 +106,7 @@ internal static class BoardArchiveTests
             {
                 using var manifestReader = new StreamReader(zip.GetEntry("settings.json")!.Open());
                 var manifest = JsonNode.Parse(await manifestReader.ReadToEndAsync())!;
-                Equal(3, manifest["version"]!.GetValue<int>());
+                Equal(1, manifest["version"]!.GetValue<int>());
                 foreach (var saved in manifest["elements"]!.AsArray())
                 {
                     if (saved!["kind"]!.GetValue<string>() != "script")
@@ -156,9 +156,9 @@ internal static class BoardArchiveTests
         });
 
         // A fixed fixture protects the current contract independently of the exporter.
-        const string version3 = """
+        const string currentManifest = """
             {
-              "format": "ILINTEA", "version": 3,
+              "format": "ILINTEA", "version": 1,
               "canvas": {},
               "elements": [{
                 "id": "8e271f90-573e-470e-b3c2-e43dfe39cacf", "kind": "text",
@@ -169,7 +169,7 @@ internal static class BoardArchiveTests
         await Run("Current settings files use defaults for omitted optional fields", async () =>
         {
             var target = new BoardStore();
-            using var archive = new MemoryStream(CreateArchive(version3));
+            using var archive = new MemoryStream(CreateArchive(currentManifest));
             var restored = await BoardArchive.RestoreAsync(archive, target);
             Equal(new CanvasSettings(), restored.Canvas);
             var element = restored.Elements.Single();
@@ -197,7 +197,7 @@ internal static class BoardArchiveTests
             Assert(restored.Elements.All(element => element.Text == content), "Large script contents changed");
         });
 
-        var scriptManifest = JsonNode.Parse(version3)!.AsObject();
+        var scriptManifest = JsonNode.Parse(currentManifest)!.AsObject();
         scriptManifest["elements"]![0]!["kind"] = "script";
         const string scriptName = "scripts/8e271f90573e470eb3c2e43dfe39cacf.txt";
         scriptManifest["elements"]![0]!["scriptFile"] = scriptName;
@@ -255,7 +255,7 @@ internal static class BoardArchiveTests
 
         await Run("Extra JSON fields and archive entries are ignored", async () =>
         {
-            var json = JsonNode.Parse(version3)!.AsObject();
+            var json = JsonNode.Parse(currentManifest)!.AsObject();
             json["futureSetting"] = new JsonObject { ["enabled"] = true };
             json["elements"]![0]!["futureElementSetting"] = "value";
             using var archive = new MemoryStream(CreateArchive(json.ToJsonString(), "../unused.txt", "ignored"u8.ToArray()));
@@ -280,15 +280,15 @@ internal static class BoardArchiveTests
 
         await Run("Understated ZIP lengths cannot bypass the decompressed byte limit", async () =>
         {
-            await RejectUnchangedAsync(WithManifestLength(CreateArchive(version3,
+            await RejectUnchangedAsync(WithManifestLength(CreateArchive(currentManifest,
                 compression: CompressionLevel.NoCompression), 16), "errors.settingsFileSize");
             // .NET's deflate reader independently rejects an inconsistent uncompressed size.
-            await RejectUnchangedAsync(WithManifestLength(CreateArchive(version3), 16), "errors.settingsFileFormat");
+            await RejectUnchangedAsync(WithManifestLength(CreateArchive(currentManifest), 16), "errors.settingsFileFormat");
         });
 
         await Run("Twenty elements and long split tokens restore while nested future arrays are ignored", async () =>
         {
-            var json = JsonNode.Parse(version3)!.AsObject();
+            var json = JsonNode.Parse(currentManifest)!.AsObject();
             var template = json["elements"]![0]!;
             json["elements"] = new JsonArray(Enumerable.Range(0, BoardStore.MaxElements).Select(_ =>
             {
@@ -311,7 +311,7 @@ internal static class BoardArchiveTests
 
         await Run("The twenty-first element is rejected before its large body is read", async () =>
         {
-            var json = JsonNode.Parse(version3)!.AsObject();
+            var json = JsonNode.Parse(currentManifest)!.AsObject();
             var template = json["elements"]![0]!;
             json["elements"] = new JsonArray(Enumerable.Range(0, BoardStore.MaxElements + 1).Select(_ =>
             {
@@ -331,14 +331,14 @@ internal static class BoardArchiveTests
 
         await Run("Streaming validation preserves UTF-8 BOM support across one-byte reads", async () =>
         {
-            using var archive = new ArchiveReadStream(CreateArchive("\uFEFF" + version3,
+            using var archive = new ArchiveReadStream(CreateArchive("\uFEFF" + currentManifest,
                 compression: CompressionLevel.NoCompression), maxReadBytes: 1);
             Equal(1, (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Length);
         });
 
         await Run("Omitted clock settings default to 24-hour display with seconds", async () =>
         {
-            var json = JsonNode.Parse(version3)!.AsObject();
+            var json = JsonNode.Parse(currentManifest)!.AsObject();
             json["elements"]![0]!["kind"] = "clock";
             using var archive = new MemoryStream(CreateArchive(json.ToJsonString()));
             var element = (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Single();
@@ -381,7 +381,7 @@ internal static class BoardArchiveTests
 
         await Run("Restoring even a visible alarm in the manifest leaves it disarmed", async () =>
         {
-            var json = JsonNode.Parse(version3)!.AsObject();
+            var json = JsonNode.Parse(currentManifest)!.AsObject();
             json["elements"]![0]!["kind"] = "alarm";
             json["elements"]![0]!["visible"] = true;
             json["elements"]![0]!["text"] = "finished";
@@ -395,9 +395,9 @@ internal static class BoardArchiveTests
 
         await Run("Unsupported versions are rejected without changing the board", async () =>
         {
-            foreach (var version in new[] { 0, 1, 2, BoardArchive.CurrentVersion + 1, int.MaxValue })
+            foreach (var version in new[] { -1, 0, BoardArchive.CurrentVersion + 1, int.MaxValue })
             {
-                var json = JsonNode.Parse(version3)!.AsObject();
+                var json = JsonNode.Parse(currentManifest)!.AsObject();
                 json["version"] = version;
                 await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileVersion");
             }
@@ -427,7 +427,7 @@ internal static class BoardArchiveTests
             ];
             foreach (var corrupt in corruptions)
             {
-                var json = JsonNode.Parse(version3)!.AsObject();
+                var json = JsonNode.Parse(currentManifest)!.AsObject();
                 corrupt(json);
                 await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileFormat");
             }
@@ -435,7 +435,7 @@ internal static class BoardArchiveTests
 
         await Run("Missing and corrupt image entries are rejected before replacing any settings", async () =>
         {
-            var json = JsonNode.Parse(version3)!.AsObject();
+            var json = JsonNode.Parse(currentManifest)!.AsObject();
             json["elements"]![0]!["kind"] = "image";
             await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileFormat");
             var name = "images/8e271f90573e470eb3c2e43dfe39cacf";
@@ -452,7 +452,7 @@ internal static class BoardArchiveTests
             await RejectUnchangedAsync(CreateArchive("null"), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive("{\"\\uD800\":0}"), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive("{\"\\uDC00\":0}"), "errors.settingsFileFormat");
-            await RejectUnchangedAsync(CreateArchive(version3, "settings.json", Encoding.UTF8.GetBytes(version3)), "errors.settingsFileFormat");
+            await RejectUnchangedAsync(CreateArchive(currentManifest, "settings.json", Encoding.UTF8.GetBytes(currentManifest)), "errors.settingsFileFormat");
         });
 
         await Run("Empty boards can be saved and restored", async () =>
@@ -470,7 +470,7 @@ internal static class BoardArchiveTests
             var target = new BoardStore(new ManualTimeProvider());
             target.Add("text");
             var before = target.Snapshot();
-            using var archive = new MemoryStream(CreateArchive(version3));
+            using var archive = new MemoryStream(CreateArchive(currentManifest));
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
             try

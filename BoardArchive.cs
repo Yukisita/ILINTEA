@@ -23,7 +23,7 @@ public sealed class BoardArchiveException(string errorKey) : Exception(errorKey)
 
 public static class BoardArchive
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 1;
     // Allows room for file entries and JSON metadata in an uploaded settings ZIP.
     public const long MaxArchiveBytes = BoardStore.MaxElements * UploadLimits.MaxRequestBodyBytes;
     // Applies only to the uncompressed settings.json, not to image or script entries.

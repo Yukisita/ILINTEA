@@ -16,7 +16,7 @@ streaming validation pass rejects more than 20 elements before deserializing the
 configuration. Size and count errors leave the current board unchanged. Script
 bodies are outside the JSON and do not count toward this manifest limit.
 
-The JSON envelope has `format: "ILINTEA"`, `version: 3`, `canvas`, and
+The JSON envelope has `format: "ILINTEA"`, `version: 1`, `canvas`, and
 `elements`. Canvas settings contain `aspectRatio` and `backgroundColor`.
 Elements contain their ID, kind, coordinates, dimensions, text, font size, color,
 alignment, visibility, `countdownText`, and script speed. For alarms, `countdownText`
@@ -46,8 +46,7 @@ Restore assigns fresh element IDs, preventing stale client edits and image cache
 entries from modifying the restored board. A successful restore publishes one
 state update; invalid files never modify the board.
 
-Keep the saved DTOs separate from runtime models. This PoC accepts only the current
-format version; previous formats have no migration or compatibility reader.
+Keep the saved DTOs separate from runtime models. This release uses format version 1.
 Unknown JSON properties are ignored. Unsupported versions and unknown element
 kinds are rejected rather than restored partially. Test round trips and failure
 atomicity whenever changing this format.
