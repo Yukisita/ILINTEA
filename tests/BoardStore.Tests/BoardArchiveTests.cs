@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -144,6 +145,80 @@ internal static class BoardArchiveTests
             Equal(1, (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Length);
         });
 
+        await Run("Manifest size checks use a separate 512 MiB limit before reading JSON", async () =>
+        {
+            Equal(536_870_912L, BoardArchive.MaxManifestBytes);
+            Assert(BoardArchive.MaxArchiveBytes > BoardArchive.MaxManifestBytes, "ZIP limit includes image bytes");
+            // Only metadata is enlarged; the actual payload remains one byte.
+            foreach (var length in new[] { BoardArchive.MaxManifestBytes - 1, BoardArchive.MaxManifestBytes })
+            {
+                using var archive = new ArchiveReadStream(WithManifestLength(CreateArchive("{"), length));
+                await RejectUnchangedAsync([], "errors.settingsFileFormat", archive);
+                Assert(archive.EntryBytesRead > 0, "A manifest at the size limit was rejected before reading");
+            }
+            using var oversized = new ArchiveReadStream(WithManifestLength(CreateArchive("{"), BoardArchive.MaxManifestBytes + 1));
+            await RejectUnchangedAsync([], "errors.settingsFileSize", oversized);
+            Equal(0L, oversized.EntryBytesRead);
+        });
+
+        await Run("Understated ZIP lengths cannot bypass the decompressed byte limit", async () =>
+        {
+            await RejectUnchangedAsync(WithManifestLength(CreateArchive(version2,
+                compression: CompressionLevel.NoCompression), 16), "errors.settingsFileSize");
+            // .NET's deflate reader independently rejects an inconsistent uncompressed size.
+            await RejectUnchangedAsync(WithManifestLength(CreateArchive(version2), 16), "errors.settingsFileFormat");
+        });
+
+        await Run("Twenty elements and long split tokens restore while nested future arrays are ignored", async () =>
+        {
+            var json = JsonNode.Parse(version2)!.AsObject();
+            var template = json["elements"]![0]!;
+            json["elements"] = new JsonArray(Enumerable.Range(0, BoardStore.MaxElements).Select(_ =>
+            {
+                var element = template.DeepClone();
+                element["id"] = Guid.NewGuid();
+                return element;
+            }).ToArray());
+            var text = new string('あ', 12_000) + "\n\"split 🌟\"";
+            json["elements"]![0]!["text"] = text;
+            json["futureSetting"] = new JsonObject
+            {
+                ["elements"] = new JsonArray(Enumerable.Range(0, BoardStore.MaxElements + 1)
+                    .Select(_ => JsonValue.Create("ignored")).ToArray())
+            };
+            using var archive = new MemoryStream(CreateArchive(json.ToJsonString()));
+            var restored = await BoardArchive.RestoreAsync(archive, new BoardStore());
+            Equal(BoardStore.MaxElements, restored.Elements.Length);
+            Equal(text, restored.Elements[0].Text);
+        });
+
+        await Run("The twenty-first element is rejected before its large body is read", async () =>
+        {
+            var json = JsonNode.Parse(version2)!.AsObject();
+            var template = json["elements"]![0]!;
+            json["elements"] = new JsonArray(Enumerable.Range(0, BoardStore.MaxElements + 1).Select(_ =>
+            {
+                var element = template.DeepClone();
+                element["id"] = Guid.NewGuid();
+                return element;
+            }).ToArray());
+            json["elements"]![BoardStore.MaxElements]!["text"] = new string('x', 128 * 1024);
+            foreach (var name in new[] { "elements", "ElEmEnTs", "\\u0065lements" })
+            {
+                var document = json.ToJsonString().Replace("\"elements\"", $"\"{name}\"");
+                using var archive = new ArchiveReadStream(CreateArchive(document, compression: CompressionLevel.NoCompression));
+                await RejectUnchangedAsync([], "errors.settingsFileFormat", archive);
+                Assert(archive.EntryBytesRead < 32 * 1024, "The excess element body was read before rejection");
+            }
+        });
+
+        await Run("Streaming validation preserves UTF-8 BOM support across one-byte reads", async () =>
+        {
+            using var archive = new ArchiveReadStream(CreateArchive("\uFEFF" + version2,
+                compression: CompressionLevel.NoCompression), maxReadBytes: 1);
+            Equal(1, (await BoardArchive.RestoreAsync(archive, new BoardStore())).Elements.Length);
+        });
+
         await Run("Older clock settings retain 24-hour display with seconds", async () =>
         {
             var json = JsonNode.Parse(version2)!.AsObject();
@@ -258,6 +333,8 @@ internal static class BoardArchiveTests
             await RejectUnchangedAsync("not a zip"u8.ToArray(), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive("{"), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive("null"), "errors.settingsFileFormat");
+            await RejectUnchangedAsync(CreateArchive("{\"\\uD800\":0}"), "errors.settingsFileFormat");
+            await RejectUnchangedAsync(CreateArchive("{\"\\uDC00\":0}"), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive(version2, "settings.json", Encoding.UTF8.GetBytes(version2)), "errors.settingsFileFormat");
         });
 
@@ -305,12 +382,13 @@ internal static class BoardArchiveTests
         return stream.ToArray();
     }
 
-    private static byte[] CreateArchive(string json, string? extraName = null, byte[]? extraBytes = null)
+    private static byte[] CreateArchive(string json, string? extraName = null, byte[]? extraBytes = null,
+        CompressionLevel compression = CompressionLevel.Optimal)
     {
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
-            using (var writer = new StreamWriter(archive.CreateEntry("settings.json").Open(), new UTF8Encoding(false)))
+            using (var writer = new StreamWriter(archive.CreateEntry("settings.json", compression).Open(), new UTF8Encoding(false)))
                 writer.Write(json);
             if (extraName is not null)
             {
@@ -321,7 +399,45 @@ internal static class BoardArchiveTests
         return stream.ToArray();
     }
 
-    private static async Task RejectUnchangedAsync(byte[] bytes, string errorKey)
+    private static byte[] WithManifestLength(byte[] bytes, long length)
+    {
+        var directory = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(bytes.Length - 22 + 16)));
+        Equal(0x02014b50u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(directory)));
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(directory + 24), checked((uint)length));
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(22), checked((uint)length));
+        return bytes;
+    }
+
+    private sealed class ArchiveReadStream(byte[] bytes, int maxReadBytes = int.MaxValue) : MemoryStream(bytes)
+    {
+        private readonly byte[] data = bytes;
+        private readonly long entryStart = 30 + BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(26))
+            + BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(28));
+        private readonly long entryLength = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(18));
+        private bool readingEntry;
+        public long EntryBytesRead { get; private set; }
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+        public override int Read(Span<byte> buffer)
+        {
+            var start = Position;
+            var count = (int)Math.Min(Math.Min(buffer.Length, maxReadBytes), Math.Max(0, Length - start));
+            data.AsSpan((int)Math.Min(start, Length), count).CopyTo(buffer);
+            Position += count;
+            if (start == entryStart) readingEntry = true;
+            if (readingEntry)
+                EntryBytesRead += Math.Max(0, Math.Min(start + count, entryStart + entryLength) - Math.Max(start, entryStart));
+            return count;
+        }
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(Read(buffer.Span));
+        }
+    }
+
+    private static async Task RejectUnchangedAsync(byte[] bytes, string errorKey, Stream? source = null)
     {
         var target = new BoardStore(new ManualTimeProvider());
         var image = target.Add("image", new("GIF89a"u8.ToArray(), "image/gif"))!;
@@ -329,7 +445,7 @@ internal static class BoardArchiveTests
         var before = target.Snapshot();
         var subscription = target.Subscribe();
         subscription.Reader.TryRead(out _);
-        using var archive = new MemoryStream(bytes);
+        using var archive = source ?? new MemoryStream(bytes);
         try
         {
             await BoardArchive.RestoreAsync(archive, target);

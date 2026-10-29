@@ -7,6 +7,14 @@ The archive contains UTF-8 `settings.json` and an `images/{elementId:N}` entry
 for each image element. Images retain their original bytes; MIME types are detected
 again during import. Entries are read in place and never extracted to disk paths.
 
+On import, the uncompressed `settings.json` is limited to 512 MiB (536,870,912
+bytes), independently of the image entries and the ZIP upload limit. Both the ZIP
+entry's declared length and the actual decompressed byte count are checked. A
+streaming validation pass rejects more than 20 elements before deserializing the
+configuration. Size and count errors leave the current board unchanged. Archives
+whose JSON exceeds this limit cannot be restored, including archives exported
+from boards with exceptionally large scripts.
+
 The JSON envelope has `format: "ILINTEA"`, `version: 2`, `canvas`, and
 `elements`. Canvas settings contain `aspectRatio` and `backgroundColor`.
 Elements contain their ID, kind, coordinates, dimensions, text, font size, color,

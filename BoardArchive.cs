@@ -22,6 +22,8 @@ public static class BoardArchive
     public const int CurrentVersion = 2;
     // Covers every permitted element, including JSON escaping of large scripts.
     public const long MaxArchiveBytes = BoardStore.MaxElements * UploadLimits.MaxRequestBodyBytes;
+    // Applies only to the uncompressed settings.json, not to image entries.
+    public const long MaxManifestBytes = 512L * 1024 * 1024;
     private const string Format = "ILINTEA";
     private const string ManifestName = "settings.json";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
@@ -53,8 +55,10 @@ public static class BoardArchive
         {
             using var archive = new ZipArchive(source, ZipArchiveMode.Read, leaveOpen: true);
             var manifest = SingleEntry(archive, ManifestName);
-            if (manifest.Length > MaxArchiveBytes) throw new BoardArchiveException("errors.settingsFileSize");
-            await using var manifestStream = manifest.Open();
+            if (manifest.Length > MaxManifestBytes) throw new BoardArchiveException("errors.settingsFileSize");
+            // Check the count before the serializer allocates the element array or its strings.
+            await ValidateManifestAsync(manifest, cancellationToken);
+            await using var manifestStream = new ManifestReadStream(manifest.Open(), manifest.Length);
             var configuration = await JsonSerializer.DeserializeAsync<BoardConfiguration>(manifestStream, Json, cancellationToken)
                 ?? throw new BoardArchiveException("errors.settingsFileFormat");
             if (configuration.Format != Format) throw new BoardArchiveException("errors.settingsFileFormat");
@@ -67,6 +71,114 @@ public static class BoardArchive
         }
         cancellationToken.ThrowIfCancellationRequested();
         return board.RestoreBackup(backup);
+    }
+
+    private static async Task ValidateManifestAsync(ZipArchiveEntry manifest, CancellationToken cancellationToken)
+    {
+        await using var stream = new ManifestReadStream(manifest.Open(), manifest.Length);
+        var buffer = new byte[(int)Math.Min(16 * 1024, manifest.Length + 1)];
+        var buffered = 0;
+        var firstBlock = true;
+        var validator = new ManifestValidator();
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (buffered == buffer.Length)
+                Array.Resize(ref buffer, (int)Math.Min(buffer.LongLength * 2, manifest.Length + 1));
+            var read = await stream.ReadAsync(buffer.AsMemory(buffered), cancellationToken);
+            buffered += read;
+            if (firstBlock)
+            {
+                // Match JsonSerializer's support for an optional UTF-8 BOM, including split reads.
+                if (buffered < 3 && read != 0) continue;
+                if (buffer.AsSpan(0, buffered).StartsWith("\uFEFF"u8))
+                {
+                    buffer.AsSpan(3, buffered - 3).CopyTo(buffer);
+                    buffered -= 3;
+                }
+                firstBlock = false;
+            }
+            var consumed = validator.Consume(buffer.AsSpan(0, buffered), read == 0);
+            buffered -= consumed;
+            buffer.AsSpan(consumed, buffered).CopyTo(buffer);
+            if (read == 0) return;
+        }
+    }
+
+    private sealed class ManifestValidator
+    {
+        private JsonReaderState state;
+        private bool expectingElements;
+        private bool readingElements;
+        private int elementCount;
+
+        public int Consume(ReadOnlySpan<byte> bytes, bool isFinalBlock)
+        {
+            var reader = new Utf8JsonReader(bytes, isFinalBlock, state);
+            while (reader.Read())
+            {
+                if (readingElements && reader.CurrentDepth == 2
+                    && reader.TokenType is not (JsonTokenType.EndObject or JsonTokenType.EndArray or JsonTokenType.PropertyName)
+                    && ++elementCount > BoardStore.MaxElements)
+                    throw new BoardArchiveException("errors.settingsFileFormat");
+                if (readingElements && reader.TokenType == JsonTokenType.EndArray && reader.CurrentDepth == 1)
+                    readingElements = false;
+                if (expectingElements)
+                {
+                    readingElements = reader.TokenType == JsonTokenType.StartArray;
+                    elementCount = 0;
+                    expectingElements = false;
+                }
+                if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 1)
+                {
+                    // Bound property-name allocations and preserve web JSON's case/escape handling.
+                    try
+                    {
+                        expectingElements = reader.ValueSpan.Length <= 6 * "elements".Length
+                            && string.Equals(reader.GetString(), "elements", StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch (InvalidOperationException exception)
+                    {
+                        throw new JsonException("Invalid JSON property name encoding.", exception);
+                    }
+                }
+            }
+            state = reader.CurrentState;
+            return checked((int)reader.BytesConsumed);
+        }
+    }
+
+    // Enforce the actual decompressed byte count too, even if ZIP metadata understates it.
+    private sealed class ManifestReadStream(Stream inner, long limit) : Stream
+    {
+        private long remaining = limit;
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+        public override int Read(Span<byte> buffer) => CountRead(inner.Read(buffer[..ReadLength(buffer.Length)]));
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            CountRead(await inner.ReadAsync(buffer[..ReadLength(buffer.Length)], cancellationToken));
+        private int ReadLength(int requested) => (int)Math.Min(requested, remaining + 1);
+        private int CountRead(int count)
+        {
+            if (count > remaining) throw new BoardArchiveException("errors.settingsFileSize");
+            remaining -= count;
+            return count;
+        }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) inner.Dispose();
+            base.Dispose(disposing);
+        }
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private static async Task<BoardBackupState> ReadConfigurationAsync(ZipArchive archive, BoardConfiguration configuration,
