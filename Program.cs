@@ -43,6 +43,11 @@ app.MapGet("/LICENSE", () => Results.File(
     Path.Combine(app.Environment.ContentRootPath, "LICENSE"), "text/plain; charset=utf-8"));
 app.MapGet("/THIRD-PARTY-NOTICES.txt", () => Results.File(
     Path.Combine(app.Environment.ContentRootPath, "THIRD-PARTY-NOTICES.txt"), "text/plain; charset=utf-8"));
+foreach (var noticeFile in new[] { "LICENSE.txt", "THIRD-PARTY-NOTICES.txt", "ADDITIONAL-NOTICES.txt" })
+{
+    app.MapGet($"/licenses/SkiaSharp/{noticeFile}", () => Results.File(
+        Path.Combine(app.Environment.ContentRootPath, "licenses", "SkiaSharp", noticeFile), "text/plain; charset=utf-8"));
+}
 
 app.MapGet("/api/board", (BoardStore board) => board.Snapshot());
 app.MapPost("/api/highlight", (BoardStore board) => board.HighlightScreen());

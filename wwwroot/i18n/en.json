@@ -160,7 +160,7 @@
   "errors.displayDelay": "Set a display delay between 1 second and 24 hours.",
   "errors.scheduleMissing": "The display schedule was changed or cancelled, or its time has passed.",
   "errors.imageSize": "Images must be 1GB or less.",
-  "errors.imageFormat": "Choose a PNG, JPEG, GIF or WebP image.",
+  "errors.imageFormat": "The image could not be read. Choose a valid PNG, JPEG, GIF or WebP image.",
   "errors.scriptFile": "Choose a TXT file of 1GB or less.",
   "errors.scriptEncoding": "Choose a TXT file saved in UTF-8.",
   "errors.scriptEmpty": "Choose a script that is not blank.",

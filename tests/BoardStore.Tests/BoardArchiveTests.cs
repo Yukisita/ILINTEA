@@ -18,8 +18,8 @@ internal static class BoardArchiveTests
             var time = source.Add("clock")!;
             source.Update(time.Id, new(null, null, null, null, null, null, null, null, null,
                 ClockHourFormat: 12, ClockShowSeconds: false));
-            var image = source.Add("image", new([137, 80, 78, 71, 13, 10, 26, 10, 1], "image/png"))!;
-            source.ReplaceImage(image.Id, new([255, 216, 255, 42], "image/jpeg"));
+            var image = source.Add("image", new(ImageFixtures.Png, "image/png"))!;
+            source.ReplaceImage(image.Id, new(ImageFixtures.Jpeg, "image/jpeg"));
             source.Update(image.Id, new(source.Snapshot().Canvas.Width - 135.1,
                 source.Snapshot().Canvas.Height - 320.1, 135.1, 320.1, null, null, null, null, null));
             var script = source.Add("script", text: "原稿\nline 2")!;
@@ -248,6 +248,8 @@ internal static class BoardArchiveTests
             await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileFormat");
             var name = "images/8e271f90573e470eb3c2e43dfe39cacf";
             await RejectUnchangedAsync(CreateArchive(json.ToJsonString(), name, "invalid"u8.ToArray()), "errors.settingsFileFormat");
+            foreach (var (_, bytes) in ImageFixtures.All)
+                await RejectUnchangedAsync(CreateArchive(json.ToJsonString(), name, bytes[..8]), "errors.settingsFileFormat");
             await RejectUnchangedAsync(CreateArchive(json.ToJsonString(), name, []), "errors.settingsFileSize");
         });
 

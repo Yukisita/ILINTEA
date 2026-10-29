@@ -1,12 +1,12 @@
 ILINTEA - Third-Party Notices
 ============================
 
-Reviewed: 2026-10-28
+Reviewed: 2026-10-29
 Scope: Windows x64, framework-dependent distribution
 
 ILINTEA is provided under the accompanying LICENSE. The following sections
 identify redistributed third-party code and a separate design acknowledgement.
-There are no additional NuGet packages or bundled external JavaScript libraries.
+SkiaSharp is included for image validation. No external JavaScript libraries are bundled.
 
 1. Redistributed code: .NET application host (apphost) 10.0.13
 ------------------------------------------------------------
@@ -79,3 +79,37 @@ THE SOFTWARE.
 
 When changing the host pack, adding dependencies, or bundling the runtime,
 update these notices for the files actually redistributed and their licenses.
+
+3. Redistributed code: SkiaSharp 4.153.1
+---------------------------------------
+SkiaSharp.dll and libSkiaSharp.dll are supplied by the official SkiaSharp and
+SkiaSharp.NativeAssets.Win32 NuGet packages, version 4.153.1.
+The managed wrapper is MIT-licensed; the native library includes components
+with their own licenses.
+
+Their license documents are kept separately from ILINTEA's own LICENSE:
+
+  licenses/SkiaSharp/LICENSE.txt
+    The original SkiaSharp MIT license, unchanged from its NuGet package.
+
+  licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt
+    The original native third-party notice collection, unchanged from
+    SkiaSharp.NativeAssets.Win32 4.153.1.
+
+  licenses/SkiaSharp/ADDITIONAL-NOTICES.txt
+    Additional notices collected by ILINTEA for the pinned native revisions.
+
+All three files accompany this distribution and should be retained when
+redistributing it. They are also accessible from the application's About dialog.
+
+The upstream collection is shared with HarfBuzzSharp and contains historical
+or unused components. Its contents are not a list of everything linked into
+the reviewed Windows DLL. The additional notices identify the pinned sources.
+
+Source: https://github.com/mono/SkiaSharp/tree/4783f51448f9b070dda4f87b83e941c9599e466e
+Skia source: https://github.com/mono/skia/tree/45afab4f1f0921f3feb97f58cf89b136fffa85e6
+Reviewed native DLL: Windows x64
+SHA-256: 935ef4a00462e6b0c4dadb870f734fa43679b4f561287fe0d28cbe2ba147e832
+
+Both managed and native package versions are fixed to 4.153.1 in the project
+and package lock files. Changing versions or platforms requires a new review.

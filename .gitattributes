@@ -1,0 +1,3 @@
+# Keep upstream license documents byte-for-byte, including their line endings.
+licenses/SkiaSharp/LICENSE.txt -text
+licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt -text

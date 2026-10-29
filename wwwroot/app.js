@@ -1,6 +1,7 @@
 import { initializeI18n, changeLanguage, t, locale, hasTranslation, withLanguage } from '/i18n.js?v=20261010-language';
 import { createEditSync } from '/edit-sync.js?v=20261014-await-edits';
 import { bindFilePicker } from '/file-picker.js?v=20261013';
+import { canDecodeImage } from '/image-validation.js?v=20261029';
 import { connectBoardEvents } from '/board-connection.js?v=20261028-websocket';
 import { getAlarmState } from '/alarm-state.js?v=20261017';
 import { displayIsWaiting as isWaiting, elementIsVisible as isVisible } from '/display-state.js?v=20261017';
@@ -833,6 +834,7 @@ async function uploadImage(file, id = null) {
     renderProperties();
     try {
         if (file.size <= 0 || file.size > maxFileBytes) throw new Error(t('errors.imageSize'));
+        if (!await canDecodeImage(file)) throw new Error(t('errors.imageFormat'));
         const form = new FormData();
         form.append('file', file);
         const element = await request(id ? `/api/images/${id}` : '/api/images', {

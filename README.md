@@ -71,24 +71,50 @@ Windowsの単体インストーラーでは、この2つを用意してくださ
 - 画面の内容はメモリー内だけに保持され、サーバーを停止・再起動すると失われます。
 - 認証・権限管理は未実装です。信頼できるLAN内で利用し、インターネットへ直接公開しないでください。
 
+## 画像の検証
+
+PNG・JPEG・GIF・WebPを追加・差し替えするときは、ブラウザー標準の機能で画像の読み込みを確認します。
+サーバー側ではSkiaSharp 4.153.1で全フレームの画素データを読み込み、ヘッダーだけの画像や破損した画像を拒否します。
+読み込みや検査に失敗した場合はエラーを表示し、既存の画像を維持します。
+設定復元にも同じ検査を適用します。デコードした画像のメモリー使用量も検査し、既存のファイル上限を超える画像は拒否します。
+
+SkiaSharpとネイティブ部品は`ILINTEA.csproj`の`[4.153.1]`で版を完全一致に固定しています。
+`packages.lock.json`とWindows x64発行用の`packages.win-x64.lock.json`には依存関係とパッケージのハッシュを記録し、通常の復元・ビルドはロックモードで実行します。
+通常ビルドとWindows x64向けの発行では、記録した版が自動更新されることはありません。
+依存関係がロックと食い違う場合は、別の版を採用せずエラーになります。
+
+版を更新するときは、プロジェクトのバージョン指定を明示的に変更し、次の操作でロックも更新してください。
+更新後は画像の検証と、配布する部品のライセンスを再確認します。
+
+```powershell
+dotnet restore ILINTEA.csproj -p:RestoreLockedMode=false --force-evaluate
+dotnet restore ILINTEA.csproj --runtime win-x64 -p:SelfContained=false -p:RestoreLockedMode=false --force-evaluate
+```
+
 ## ライセンス
 
 ILINTEAは[MIT License](LICENSE)で提供します。
 Copyright (c) 2026 S.Yukisita
 
-第三者由来のライセンスと著作権表示は[THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)に収録しています。
+第三者由来のライセンスと著作権表示の案内は[THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)に収録しています。
+SkiaSharp由来の文書は、[licenses/SkiaSharp/](licenses/SkiaSharp/)に分けて保存しています。
+`LICENSE.txt`と`THIRD-PARTY-NOTICES.txt`はNuGetパッケージの原本を変更せず収録し、
+指定版の内部部品に対応する追加通知は`ADDITIONAL-NOTICES.txt`に収録しています。
 現行のWindows x64版について、同梱するコードとデザインの参照元を区別しています。
 
 | 区分 | 対象 | 取り扱い |
 | --- | --- | --- |
 | 配布に含む | .NET apphost 10.0.13 | `ILINTEA.exe`の起動部分。MITライセンス全文を同梱 |
+| 配布に含む | SkiaSharp / SkiaSharp.NativeAssets.Win32 4.153.1 | 画像の検証に使用。本体のMITと、内部部品のライセンス・通知を同梱 |
 | デザインの参照元 | Bootstrap 5.3.0 | 配色・スタイル値の参考。MIT表記を保持。Bootstrap本体やアイコン・フォントは同梱しない |
 
-追加のNuGetパッケージや外部JavaScriptライブラリの同梱はありません。
+外部JavaScriptライブラリの同梱はありません。
+SkiaSharpのライセンス確認の対象は、公式4.153.1のWindows x64版です。
+その内部部品を含め、ソース非公開の商用派生製品を配布する方針と両立する条件を確認しています。
 
-アプリ情報から、このアプリのMITライセンス全文と第三者のライセンス表示を開けます。
-`LICENSE`と`THIRD-PARTY-NOTICES.txt`は通常ビルド・`dotnet publish`の出力に自動で含まれます。
-再配布する際は、この2ファイルも同梱してください。
+アプリ情報から、このアプリのMITライセンス全文と第三者の通知、SkiaSharpの各ライセンス文書を開けます。
+`LICENSE`・`THIRD-PARTY-NOTICES.txt`と`licenses/SkiaSharp/`内の3ファイルは、
+通常ビルド・`dotnet publish`の出力に自動で含まれます。再配布する際も一式を同梱してください。
 
 依存関係、SDKの起動用ホスト、配布方式を変更した場合は、実際に同梱する内容に合わせて表示を更新してください。
 Windows版.NETの一部バイナリにはMIT以外の条件もあるため、ランタイムを同梱する配布へ変更する場合は

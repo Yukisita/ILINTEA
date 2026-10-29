@@ -160,7 +160,7 @@
   "errors.displayDelay": "表示までの時間は1秒～24時間で指定してください。",
   "errors.scheduleMissing": "表示予約は変更・解除済みか、表示時刻を過ぎています。",
   "errors.imageSize": "画像は1GB以下にしてください。",
-  "errors.imageFormat": "PNG・JPEG・GIF・WebPの画像を選んでください。",
+  "errors.imageFormat": "画像を読み込めません。破損していないPNG・JPEG・GIF・WebPの画像を選んでください。",
   "errors.scriptFile": "1GB以下のTXTファイルを選んでください。",
   "errors.scriptEncoding": "UTF-8で保存したTXTファイルを選んでください。",
   "errors.scriptEmpty": "空欄ではない原稿を選んでください。",

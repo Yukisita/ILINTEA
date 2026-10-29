@@ -94,17 +94,7 @@ Run("Canvas and element colors use the same strict validation", () =>
     }
 });
 
-Run("Image detection accepts supported signatures and rejects incomplete or unknown data", () =>
-{
-    Equal("image/png", ImageData.DetectContentType([137, 80, 78, 71, 13, 10, 26, 10]));
-    Equal("image/jpeg", ImageData.DetectContentType([255, 216, 255]));
-    Equal("image/gif", ImageData.DetectContentType("GIF87a"u8.ToArray()));
-    Equal("image/gif", ImageData.DetectContentType("GIF89a"u8.ToArray()));
-    Equal("image/webp", ImageData.DetectContentType("RIFFxxxxWEBP"u8.ToArray()));
-    Equal<string?>(null, ImageData.DetectContentType("RIFFxxxxWEB"u8.ToArray()));
-    Equal<string?>(null, ImageData.DetectContentType("unknown"u8.ToArray()));
-    Equal<string?>(null, ImageData.DetectContentType([]));
-});
+passed += ImageDataTests.Run();
 
 Run("Snapshots and subscription events use the supplied clock", () =>
 {
