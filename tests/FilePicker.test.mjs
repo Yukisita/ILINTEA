@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bindFilePicker } from '../wwwroot/file-picker.js';
+import { bindFilePicker } from '../src/ILINTEA/wwwroot/file-picker.js';
 
 function control() {
     const listeners = new Map();

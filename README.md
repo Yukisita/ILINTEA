@@ -21,16 +21,16 @@
 .NET 10 SDKをインストールし、リポジトリのフォルダーで実行します。
 
 ```powershell
-dotnet run --project ILINTEA.csproj
+dotnet run --project src/ILINTEA/ILINTEA.csproj
 ```
 
 - 編集画面：<http://localhost:5280/>
 - 閲覧画面：<http://localhost:5280/view/>
 
-別端末で閲覧する場合は、編集画面の「閲覧URLをコピー」からURLを取得してください。ポートなどの設定は`ILINTEA.ini`で変更できます。
+別端末で閲覧する場合は、編集画面の「閲覧URLをコピー」からURLを取得してください。ポートなどの設定は[`src/ILINTEA/ILINTEA.ini`](src/ILINTEA/ILINTEA.ini)で変更できます。
 
-Visual Studioなどで通常ビルドした場合も、`bin/Debug/`または
-`bin/Release/`の直下に実行ファイル・`ILINTEA.ini`・`wwwroot/`が揃います。
+Visual Studioなどで通常ビルドした場合も、`src/ILINTEA/bin/Debug/`または
+`src/ILINTEA/bin/Release/`の直下に実行ファイル・`ILINTEA.ini`・`wwwroot/`が揃います。
 実行ファイルを直接起動する場合は、このフォルダーの内容を一式で配置してください。
 設定と画面データは、起動時の作業フォルダーにかかわらず実行ファイルのフォルダーから読み込みます。
 実行先には、.NET 10の次の共有ランタイムが必要です。
@@ -80,8 +80,8 @@ PNG・JPEG・GIF・WebPを追加・差し替えするときは、ブラウザー
 読み込みや検査に失敗した場合はエラーを表示し、既存の画像を維持します。
 設定復元にも同じ検査を適用します。デコードした画像のメモリー使用量も検査し、既存のファイル上限を超える画像は拒否します。
 
-SkiaSharpとネイティブ部品は`ILINTEA.csproj`の`[4.153.1]`で版を完全一致に固定しています。
-`packages.lock.json`とWindows x64発行用の`packages.win-x64.lock.json`には依存関係とパッケージのハッシュを記録し、通常の復元・ビルドはロックモードで実行します。
+SkiaSharpとネイティブ部品は[`src/ILINTEA/ILINTEA.csproj`](src/ILINTEA/ILINTEA.csproj)の`[4.153.1]`で版を完全一致に固定しています。
+同じフォルダーの`packages.lock.json`とWindows x64発行用の`packages.win-x64.lock.json`には依存関係とパッケージのハッシュを記録し、通常の復元・ビルドはロックモードで実行します。
 通常ビルドとWindows x64向けの発行では、記録した版が自動更新されることはありません。
 依存関係がロックと食い違う場合は、別の版を採用せずエラーになります。
 
@@ -89,8 +89,28 @@ SkiaSharpとネイティブ部品は`ILINTEA.csproj`の`[4.153.1]`で版を完�
 更新後は画像の検証と、配布する部品のライセンスを再確認します。
 
 ```powershell
-dotnet restore ILINTEA.csproj -p:RestoreLockedMode=false --force-evaluate
-dotnet restore ILINTEA.csproj --runtime win-x64 -p:SelfContained=false -p:RestoreLockedMode=false --force-evaluate
+dotnet restore src/ILINTEA/ILINTEA.csproj -p:RestoreLockedMode=false --force-evaluate
+dotnet restore src/ILINTEA/ILINTEA.csproj --runtime win-x64 -p:SelfContained=false -p:RestoreLockedMode=false --force-evaluate
+```
+
+## 開発用の構成
+
+```text
+src/ILINTEA/     アプリ本体・設定・Webファイル・依存関係のロックファイル
+tests/          C#とJavaScriptのテスト・ビルド出力の検証
+docs/           設定ファイル形式などの技術資料
+licenses/       第三者のライセンス文書
+ILINTEA.slnx    Visual Studioなどで開くソリューション
+```
+
+リポジトリのフォルダーで、次のコマンドを実行します。
+
+```powershell
+dotnet build ILINTEA.slnx
+dotnet build ILINTEA.slnx --configuration Release
+dotnet run --project tests/BoardStore.Tests
+node --test tests/*.test.mjs
+./tests/VerifyBuildOutput.ps1
 ```
 
 ## ライセンス
