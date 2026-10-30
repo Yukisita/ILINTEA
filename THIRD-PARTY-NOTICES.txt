@@ -1,0 +1,115 @@
+ILINTEA - Third-Party Notices
+============================
+
+Reviewed: 2026-10-29
+Scope: Windows x64, framework-dependent distribution
+
+ILINTEA is provided under the accompanying LICENSE. The following sections
+identify redistributed third-party code and a separate design acknowledgement.
+SkiaSharp is included for image validation. No external JavaScript libraries are bundled.
+
+1. Redistributed code: .NET application host (apphost) 10.0.13
+------------------------------------------------------------
+ILINTEA.exe contains the native .NET application host supplied by
+Microsoft.NETCore.App.Host.win-x64 10.0.13 in .NET SDK 10.0.402.
+This native launcher is embedded in ILINTEA.exe. Its copyright and MIT license
+are reproduced below. Runtime installation requirements are documented in README.md.
+
+Project: https://github.com/dotnet/runtime
+Source: https://github.com/dotnet/runtime/tree/v10.0.13/src/native/corehost/apphost
+License: https://github.com/dotnet/runtime/blob/v10.0.13/LICENSE.TXT
+Windows binary licensing: https://github.com/dotnet/core/blob/main/license-information-windows.md
+
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+2. Design acknowledgement: Bootstrap 5.3.0
+-----------------------------------------
+Palette and control styling values in wwwroot/app.css were referenced from
+Bootstrap. The stylesheet is implemented for ILINTEA; Bootstrap's CSS and
+JavaScript bundles, Bootstrap Icons, and font files are not included.
+The following MIT notice credits that styling reference, not a bundled library.
+
+Project: https://getbootstrap.com/
+License: https://github.com/twbs/bootstrap/blob/v5.3.0/LICENSE
+
+The MIT License (MIT)
+
+Copyright (c) 2011-2023 The Bootstrap Authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+When changing the host pack, adding dependencies, or bundling the runtime,
+update these notices for the files actually redistributed and their licenses.
+
+3. Redistributed code: SkiaSharp 4.153.1
+---------------------------------------
+SkiaSharp.dll and libSkiaSharp.dll are supplied by the official SkiaSharp and
+SkiaSharp.NativeAssets.Win32 NuGet packages, version 4.153.1.
+The managed wrapper is MIT-licensed; the native library includes components
+with their own licenses.
+
+Their license documents are kept separately from ILINTEA's own LICENSE:
+
+  licenses/SkiaSharp/LICENSE.txt
+    The original SkiaSharp MIT license, unchanged from its NuGet package.
+
+  licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt
+    The original native third-party notice collection, unchanged from
+    SkiaSharp.NativeAssets.Win32 4.153.1.
+
+  licenses/SkiaSharp/ADDITIONAL-NOTICES.txt
+    Additional notices collected by ILINTEA for the pinned native revisions.
+
+All three files accompany this distribution and should be retained when
+redistributing it. They are also accessible from the application's About dialog.
+
+The upstream collection is shared with HarfBuzzSharp and contains historical
+or unused components. Its contents are not a list of everything linked into
+the reviewed Windows DLL. The additional notices identify the pinned sources.
+
+Source: https://github.com/mono/SkiaSharp/tree/4783f51448f9b070dda4f87b83e941c9599e466e
+Skia source: https://github.com/mono/skia/tree/45afab4f1f0921f3feb97f58cf89b136fffa85e6
+Reviewed native DLL: Windows x64
+SHA-256: 935ef4a00462e6b0c4dadb870f734fa43679b4f561287fe0d28cbe2ba147e832
+
+Both managed and native package versions are fixed to 4.153.1 in the project
+and package lock files. Changing versions or platforms requires a new review.

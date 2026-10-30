@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="app.name"></title>
+  <link rel="stylesheet" href="/app.css?v=20261028-clock-display">
+  <script type="module" src="/app.js?v=20261029-image-validation"></script>
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-start">
+      <button id="open-settings" class="navbar-button" type="button" aria-haspopup="dialog" aria-controls="settings-dialog"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg><span data-i18n="settings.title"></span></button>
+    </div>
+    <a class="brand" href="/"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M7 3h14v14M3 7h14v14H3z"/></svg><span data-i18n="app.brand"></span></a>
+    <div class="navbar-end"><span id="connection" class="connection" role="status" data-i18n="connection.initial"></span></div>
+  </header>
+  <main>
+    <div class="mode-bar">
+      <nav class="mode-tabs" data-i18n-aria-label="navigation.label"><a href="/" id="edit-tab" data-i18n="navigation.edit"></a><a href="/view/" id="view-tab" data-i18n="navigation.view"></a></nav>
+      <div class="mode-actions">
+        <button id="highlight-screen" class="accent editor-only" type="button" disabled aria-pressed="false" data-i18n="highlight.start" data-i18n-title="highlight.description"></button>
+        <span id="viewer-alarm-status" class="muted viewer-only"></span>
+        <div class="button-group viewer-only"><button id="flip-x" aria-pressed="false" data-i18n="viewer.flipX"></button><button id="flip-y" aria-pressed="false" data-i18n="viewer.flipY"></button><button id="fullscreen" data-i18n="viewer.fullscreen"></button></div>
+      </div>
+    </div>
+    <div id="notice" class="notice" role="alert" hidden></div>
+    <div class="toolbar editor-only">
+      <div class="button-group"><button id="add-clock" disabled data-i18n="add.clock"></button><button id="add-text" disabled data-i18n="add.text"></button><button id="add-alarm" disabled data-i18n="add.alarm"></button><button id="add-image" disabled data-i18n="add.image"></button><button id="add-script" disabled data-i18n="add.script"></button><input id="image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden><input id="script-file" type="file" accept=".txt,text/plain" hidden></div>
+    </div>
+    <div class="workspace">
+      <section class="elements-panel editor-only" data-i18n-aria-label="elements.title">
+        <div class="panel-heading"><h2 data-i18n="elements.title"></h2><span id="element-count" class="muted"></span></div>
+        <div id="element-list"></div>
+      </section>
+      <section class="canvas-column" data-i18n-aria-label="canvas.title">
+        <div class="monitor-grid">
+          <section class="monitor preview-monitor" data-i18n-aria-label="monitor.previewLabel">
+            <div class="monitor-heading editor-only"><h2><span class="monitor-dot"></span><span data-i18n="monitor.preview"></span></h2></div>
+            <div id="stage-host" class="stage-host">
+              <div id="stage-viewport" class="stage-viewport"><div id="stage" class="stage"></div></div>
+              <div id="viewer-highlight" class="screen-highlight viewer-only" aria-hidden="true" hidden></div>
+              <button id="exit-fullscreen" class="fullscreen-exit" data-i18n="viewer.exitFullscreen"></button>
+              <button id="stop-alarm" class="stop-alarm viewer-only" hidden data-i18n="viewer.stopAlarm"></button>
+            </div>
+          </section>
+          <section class="monitor program-monitor editor-only" data-i18n-aria-label="monitor.programLabel">
+            <div class="monitor-heading"><h2><span class="monitor-dot"></span><span data-i18n="monitor.program"></span></h2></div>
+            <div id="program-host" class="stage-host">
+              <div id="program-viewport" class="stage-viewport"><div id="program-stage" class="stage"></div></div>
+              <div id="program-highlight" class="screen-highlight" aria-hidden="true" hidden></div>
+            </div>
+          </section>
+        </div>
+      </section>
+      <aside class="properties editor-only" data-i18n-aria-label="properties.title">
+        <h2 id="property-title" data-i18n="properties.title"></h2>
+        <p id="selection-empty" class="empty-state" data-i18n="properties.selectionEmpty"></p>
+        <fieldset id="property-fields" hidden>
+          <div class="property-editor">
+            <div id="image-fields" class="file-controls" hidden><button id="replace-image" type="button" data-i18n="image.replace"></button><input id="replacement-image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div>
+            <div id="script-file-fields" class="file-controls" hidden><button id="replace-script" type="button" data-i18n="script.replace"></button><input id="replacement-script-file" type="file" accept=".txt,text/plain" hidden></div>
+            <div id="alarm-message-fields" hidden><label for="countdown-text" data-i18n="alarm.countdownMessage"></label><textarea id="countdown-text" rows="3" maxlength="4000"></textarea></div>
+            <div id="text-fields"><label id="text-label" for="text" data-i18n="properties.text"></label><textarea id="text" rows="5" maxlength="4000"></textarea></div>
+            <div id="alarm-settings" hidden>
+              <label for="alarm-at"><span data-i18n="alarm.at"></span> <span class="muted" data-i18n="alarm.silent"></span></label>
+              <input id="alarm-at" type="datetime-local" step="1" required>
+              <button id="schedule-alarm" class="accent" type="button" hidden data-i18n="alarm.changeSchedule"></button>
+            </div>
+            <div id="script-fields" hidden>
+              <label for="script-speed"><span data-i18n="script.speed"></span> <output id="script-speed-value"></output></label>
+              <input id="script-speed" type="range" min="5" max="200" step="5" value="30">
+              <div class="button-group script-controls"><button id="script-play" class="accent" type="button" data-i18n="script.play"></button><button id="script-pause" type="button" data-i18n="script.pause"></button><button id="script-reset" type="button" data-i18n="script.reset"></button></div>
+              <p id="script-status" class="muted" role="status"></p>
+            </div>
+            <div id="type-fields">
+              <div class="field-row"><label for="font-size" data-i18n="properties.fontSize"></label><input id="font-size" type="number" min="12" max="160"></div>
+              <div class="field-row"><label for="color" data-i18n="properties.color"></label><input id="color" type="color"></div>
+              <div class="field-row"><label for="align" data-i18n="properties.align"></label><select id="align"><option value="left" data-i18n="properties.alignLeft"></option><option value="center" data-i18n="properties.alignCenter"></option><option value="right" data-i18n="properties.alignRight"></option></select></div>
+            </div>
+            <h3 data-i18n="position.title"></h3>
+            <div class="position-grid">
+              <label><span data-i18n="position.x"></span><input id="x" type="number" min="0" max="1200"></label><label><span data-i18n="position.y"></span><input id="y" type="number" min="0" max="672"></label>
+              <label><span data-i18n="position.width"></span><input id="width" type="number" min="80" max="1280"></label><label><span data-i18n="position.height"></span><input id="height" type="number" min="48" max="720"></label>
+            </div>
+            <section id="clock-settings" aria-labelledby="clock-settings-title" hidden>
+              <h3 id="clock-settings-title" data-i18n="clock.displaySettings"></h3>
+              <label for="clock-hour-format"><span data-i18n="clock.hourFormat"></span><select id="clock-hour-format"><option value="24" data-i18n="clock.hour24"></option><option value="12" data-i18n="clock.hour12"></option></select></label>
+              <label for="clock-show-seconds"><span data-i18n="clock.precision"></span><select id="clock-show-seconds"><option value="true" data-i18n="clock.withSeconds"></option><option value="false" data-i18n="clock.withoutSeconds"></option></select></label>
+            </section>
+            <div class="delete-actions"><button id="delete-element" class="danger" type="button" data-i18n="delete.button"></button><div id="delete-confirmation" hidden><span data-i18n="delete.confirmation"></span><button id="confirm-delete" class="danger primary" type="button" data-i18n="delete.confirm"></button><button id="cancel-delete" type="button" data-i18n="delete.cancel"></button></div></div>
+          </div>
+          <section class="display-panel" aria-labelledby="display-heading">
+            <div class="display-options">
+              <div class="display-heading"><h3 id="display-heading" data-i18n="display.title"></h3><span id="display-state" class="display-state" role="status"></span></div>
+              <div id="display-schedule-fields" class="display-schedule">
+                <label for="display-delay" data-i18n="display.delayLabel"></label>
+                <div class="delay-inputs"><input id="display-delay" data-i18n-aria-label="display.delayAria" type="number" min="1" max="86400" step="1" value="10"><select id="display-unit" data-i18n-aria-label="display.unit"><option value="1" data-i18n="display.seconds"></option><option value="60" data-i18n="display.minutes"></option></select><button id="schedule-display" class="accent" type="button" data-i18n="display.schedule"></button></div>
+              </div>
+              <div class="schedule-status"><p id="display-status" class="muted"></p><button id="cancel-display" type="button" hidden data-i18n="display.cancelSchedule"></button></div>
+            </div>
+            <div class="visibility-actions"><button id="toggle-visibility" class="primary" type="button" aria-describedby="display-state" data-i18n="display.show"></button></div>
+          </section>
+        </fieldset>
+      </aside>
+    </div>
+  </main>
+  <dialog id="settings-dialog" class="settings-drawer" aria-labelledby="settings-title">
+    <header class="settings-header">
+      <h2 id="settings-title" data-i18n="settings.title"></h2>
+      <form method="dialog"><button class="settings-close" type="submit" autofocus data-i18n-aria-label="settings.close"><span aria-hidden="true">×</span></button></form>
+    </header>
+    <div id="settings-notice-slot"></div>
+    <div class="settings-content">
+      <section class="settings-section">
+        <label for="language" data-i18n="language.label"></label>
+        <select id="language"><option value="ja" data-i18n="language.japanese"></option><option value="en" data-i18n="language.english"></option></select>
+      </section>
+      <section class="settings-section editor-only" aria-labelledby="canvas-settings-title">
+        <h3 id="canvas-settings-title" data-i18n="settings.canvas"></h3>
+        <div class="canvas-settings">
+          <div class="settings-field"><label for="aspect-ratio" data-i18n="canvas.ratio"></label><select id="aspect-ratio" disabled><option value="16:9">16:9</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="3:4" data-i18n="canvas.ratioPortrait34"></option><option value="9:16" data-i18n="canvas.ratioPortrait916"></option></select></div>
+          <div class="settings-field"><label for="background-color" data-i18n="canvas.background"></label><input id="background-color" type="color" value="#000000" disabled></div>
+        </div>
+      </section>
+      <section class="settings-section editor-only" aria-labelledby="settings-files-title">
+        <h3 id="settings-files-title" data-i18n="settings.files"></h3>
+        <div class="settings-actions" data-i18n-title="settings.scope"><button id="download-settings" type="button" disabled data-i18n="settings.download"></button><button id="upload-settings" type="button" disabled data-i18n="settings.upload"></button><input id="settings-file" type="file" accept=".zip,application/zip" hidden></div>
+      </section>
+      <section class="settings-section editor-only" aria-labelledby="settings-sharing-title">
+        <h3 id="settings-sharing-title" data-i18n="settings.sharing"></h3>
+        <button id="copy-link" type="button" data-i18n="viewer.copyUrl"></button>
+      </section>
+      <section class="settings-section">
+        <button id="open-about" type="button" aria-haspopup="dialog" aria-controls="about-dialog" data-i18n="about.title"></button>
+      </section>
+    </div>
+  </dialog>
+  <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title">
+    <header class="about-heading"><h2 id="about-title" data-i18n="about.title"></h2></header>
+    <div class="about-content">
+      <img class="about-illustration" src="/images/about-character.png" width="1254" height="1254" loading="lazy" decoding="async" alt="" data-i18n-alt="about.illustrationAlt">
+      <div class="about-copy">
+        <p class="about-name" data-i18n="about.name"></p>
+        <p class="about-full-name" data-i18n="about.fullName"></p>
+        <p class="about-license" lang="en">
+          <a href="/LICENSE" target="_blank" rel="noopener" data-i18n="about.license"></a><br>
+          <span data-i18n="about.copyright"></span><br>
+          <a href="/THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener" data-i18n="about.thirdPartyNotices"></a><br>
+          <a href="/licenses/SkiaSharp/LICENSE.txt" target="_blank" rel="noopener">SkiaSharp license</a><br>
+          <a href="/licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener">SkiaSharp third-party notices</a><br>
+          <a href="/licenses/SkiaSharp/ADDITIONAL-NOTICES.txt" target="_blank" rel="noopener">SkiaSharp additional notices</a>
+        </p>
+      </div>
+    </div>
+    <form method="dialog" class="about-actions"><button class="primary" type="submit" autofocus data-i18n="about.close"></button></form>
+  </dialog>
+</body>
+</html>
