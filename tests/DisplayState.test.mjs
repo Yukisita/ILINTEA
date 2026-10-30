@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { displayIsWaiting, elementIsVisible } from '../wwwroot/display-state.js';
+import { displayIsWaiting, elementIsVisible } from '../src/ILINTEA/wwwroot/display-state.js';
 
 const start = Date.parse('2026-10-17T12:00:00Z');
 for (const kind of ['text', 'clock', 'image', 'script', 'alarm']) {

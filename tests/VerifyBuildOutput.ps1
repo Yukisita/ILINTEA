@@ -6,7 +6,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$sourceRoot = Join-Path $repositoryRoot 'wwwroot'
+$applicationRoot = Join-Path $repositoryRoot 'src/ILINTEA'
+$sourceRoot = Join-Path $applicationRoot 'wwwroot'
 $sourceFiles = @(Get-ChildItem -LiteralPath $sourceRoot -File -Recurse)
 $executable = if ([Environment]::OSVersion.Platform -eq 'Win32NT') { 'ILINTEA.exe' } else { 'ILINTEA' }
 $noticeFiles = @('LICENSE', 'THIRD-PARTY-NOTICES.txt',
@@ -17,7 +18,7 @@ foreach ($configurationName in $Configuration) {
     $outputRoot = if ($ArtifactsPath) {
         Join-Path $ArtifactsPath "bin/ILINTEA/$($configurationName.ToLowerInvariant())"
     } else {
-        Join-Path $repositoryRoot "bin/$configurationName"
+        Join-Path $applicationRoot "bin/$configurationName"
     }
     foreach ($requiredFile in (@($executable, 'ILINTEA.dll', 'ILINTEA.deps.json', 'ILINTEA.runtimeconfig.json', 'ILINTEA.ini') + $noticeFiles)) {
         if (-not (Test-Path -LiteralPath (Join-Path $outputRoot $requiredFile) -PathType Leaf)) {

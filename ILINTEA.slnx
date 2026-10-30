@@ -1,4 +1,4 @@
 <Solution>
-  <Project Path="ILINTEA.csproj" />
+  <Project Path="src/ILINTEA/ILINTEA.csproj" />
   <Project Path="tests/BoardStore.Tests/BoardStore.Tests.csproj" />
 </Solution>

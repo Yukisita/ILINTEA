@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createEditSync } from '../wwwroot/edit-sync.js';
+import { createEditSync } from '../src/ILINTEA/wwwroot/edit-sync.js';
 
 function deferred() {
     let resolve;

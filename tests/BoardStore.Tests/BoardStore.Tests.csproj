@@ -6,6 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../ILINTEA.csproj" />
+    <ProjectReference Include="../../src/ILINTEA/ILINTEA.csproj" />
   </ItemGroup>
 </Project>
