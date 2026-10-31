@@ -21,7 +21,7 @@
   "connection.connected": "同期中",
   "connection.reconnecting": "再接続中…",
   "connection.lostChanges": "接続が切れました。未反映の変更は、再接続後にもう一度入力してください。",
-  "viewer.copyUrl": "↗ 閲覧URLをコピー",
+  "viewer.copyUrl": "閲覧URLをコピー",
   "viewer.urlCopied": "閲覧URLをコピーしました。同じLAN内の端末で開いてください。",
   "viewer.copyPrompt": "この閲覧URLをコピーして、別の端末で開いてください。",
   "viewer.flipX": "↔ 左右反転",
