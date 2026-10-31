@@ -414,7 +414,7 @@ function renderDisplayControls() {
     }
     for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || onProgram;
     $('toggle-visibility').disabled = busy;
-    $('toggle-visibility').classList.toggle('primary', !onProgram);
+    $('toggle-visibility').setAttribute('aria-pressed', String(onProgram));
     $('cancel-display').disabled = busy;
     $('delete-element').disabled = busy;
     $('confirm-delete').disabled = busy;
