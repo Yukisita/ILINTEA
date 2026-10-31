@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { getAlarmState } from '../wwwroot/alarm-state.js';
+import { getAlarmState } from '../src/ILINTEA/wwwroot/alarm-state.js';
 
 const deadline = Date.parse('2026-10-14T12:00:00Z');
 const alarm = {

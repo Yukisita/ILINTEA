@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createClockFormatter } from '../wwwroot/clock-format.js';
+import { createClockFormatter } from '../src/ILINTEA/wwwroot/clock-format.js';
 
 const afternoon = new Date(2026, 9, 28, 21, 4, 5);
 

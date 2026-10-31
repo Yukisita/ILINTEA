@@ -19,13 +19,12 @@
     <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="[4.153.1]" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="tests/**/*.cs" />
-    <Content Remove="tests/**" />
     <Content Remove="packages*.lock.json" />
     <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="ILINTEA.ini" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="LICENSE;THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="licenses/SkiaSharp/*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../licenses/SkiaSharp/*.txt" Link="licenses/SkiaSharp/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="wwwroot/i18n/*.json" WithCulture="false" />
   </ItemGroup>
 </Project>

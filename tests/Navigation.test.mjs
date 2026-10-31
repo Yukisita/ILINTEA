@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { preventSamePageNavigation } from '../wwwroot/navigation.js';
+import { preventSamePageNavigation } from '../src/ILINTEA/wwwroot/navigation.js';
 
 function setup(href, current = 'http://localhost:5280/', { target = '', download = false } = {}) {
     const link = Object.assign(new EventTarget(), {
