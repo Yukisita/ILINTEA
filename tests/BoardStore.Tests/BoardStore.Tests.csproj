@@ -6,9 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SkiaSharp" Version="4.153.1" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="../../src/ILINTEA/ILINTEA.csproj" />
   </ItemGroup>
 </Project>
