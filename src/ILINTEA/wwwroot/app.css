@@ -71,8 +71,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .settings-drawer::backdrop { background: #0008; }
 .settings-header { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px; background: var(--accent); color: #fff; }
 .settings-header h2 { font-size: 20px; }
-.settings-header form { margin: 0; }
-.settings-close { width: var(--control-height); padding: 0; font-size: 24px; }
+.settings-header form { display: flex; margin: 0; }
+.settings-close { width: var(--control-height); height: var(--control-height); padding: 0; }
 #settings-notice-slot { flex: none; }
 #settings-dialog .notice { position: static; transform: none; max-width: none; max-height: 30dvh; overflow-y: auto; margin: 16px 24px 0; box-shadow: none; }
 .settings-content { flex: 1; min-height: 0; padding: 24px; overflow-y: auto; overscroll-behavior: contain; }
