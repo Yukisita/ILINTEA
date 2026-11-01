@@ -21,7 +21,7 @@
   "connection.connected": "Connected",
   "connection.reconnecting": "Reconnecting…",
   "connection.lostChanges": "Connection lost. Re-enter unsaved changes after reconnecting.",
-  "viewer.copyUrl": "↗ Copy viewer URL",
+  "viewer.copyUrl": "Copy viewer URL",
   "viewer.urlCopied": "Viewer URL copied. Open it on a device on the same LAN.",
   "viewer.copyPrompt": "Copy this viewer URL and open it on another device.",
   "viewer.flipX": "↔ Flip horizontally",
