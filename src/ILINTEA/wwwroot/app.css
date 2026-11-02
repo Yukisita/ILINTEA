@@ -185,7 +185,8 @@ body:not(.viewer) #stage .element.selected { outline: 3px solid var(--accent); }
 .resize-handle { --button-hover: var(--accent-hover); position: absolute; width: 24px; height: 24px; min-height: 0; right: -3px; bottom: -3px; border: 3px solid #fff; background: var(--accent); cursor: nwse-resize; padding: 0; border-radius: 0; touch-action: none; }
 .properties, .elements-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px #00000013; }
 h2 { margin: 0; font-size: 16px; font-weight: 500; }
-.properties > h2 { flex: none; background: var(--accent); color: #fff; padding: 12px 16px; }
+.properties > h2, .panel-heading { flex: none; display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid transparent; }
+.properties > h2 { background: var(--accent); color: #fff; }
 .properties fieldset { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; margin: 0; padding: 0; border: 0; }
 .property-editor { flex: 1; min-height: 0; overflow-y: auto; padding: 18px; }
 .file-controls { margin-bottom: 12px; }
@@ -203,7 +204,7 @@ h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid var(--border); 
 #clock-settings label + label { margin-top: 10px; }
 #clock-settings select { margin-top: 5px; }
 .empty-state { font-size: 13px; line-height: 1.8; color: var(--muted); padding: 22px 16px; margin: 0; white-space: pre-line; }
-.panel-heading { display: flex; justify-content: space-between; padding: 12px 16px; background: var(--surface-muted); border-bottom: 1px solid var(--border); }
+.panel-heading { justify-content: space-between; background: var(--surface-muted); border-bottom-color: var(--border); }
 #element-list { padding: 8px; }
 .element-row { display: flex; gap: 4px; align-items: center; border: 1px solid transparent; border-radius: var(--control-radius); }
 .element-row.active { background: var(--accent-soft); border-color: var(--accent-border); }
@@ -247,11 +248,10 @@ body:not(.viewer) .notice { position: fixed; z-index: 200; top: 58px; left: 50%;
   body:not(.viewer) .toolbar { flex: none; padding: 8px 12px; margin-bottom: 12px; }
   body:not(.viewer) .workspace { grid-template-columns: 240px 360px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "elements properties canvas"; gap: 12px; }
   body:not(.viewer) .elements-panel { max-height: none; }
-  .elements-panel .panel-heading { padding: 12px 10px; }
+  .properties > h2, .elements-panel .panel-heading { padding: 10px 12px; }
   #element-list { padding: 6px; }
   .element-row { min-height: 32px; }
   .element-row > .element-select { min-height: var(--compact-height); gap: 6px; padding: 4px 6px; }
-  .properties > h2 { padding: 10px 12px; }
   .property-editor, .display-panel { padding: 10px 12px; }
   .properties textarea { height: 84px; resize: none; margin: 6px 0 8px; padding: 7px 9px; }
   #script-fields { padding: 0 0 8px; }
