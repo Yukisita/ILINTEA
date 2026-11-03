@@ -8,6 +8,24 @@ namespace ILINTEA;
 
 internal static class TrayApplication
 {
+    public static Mutex? AcquireInstance()
+    {
+        // Keep the named handle alive until this Windows session's instance exits.
+        var instance = new Mutex(false, @"Local\ILINTEA.SingleInstance.33F2B568-191D-4B74-8B53-F6EC877ABF53", out var created);
+        if (created) return instance;
+
+        instance.Dispose();
+        MessageBox.Show(I18n.Text("tray.alreadyRunning"), I18n.Text("app.name"),
+            MessageBoxButtons.OK, MessageBoxIcon.Information);
+        return null;
+    }
+
+    public static void ShowStartupError(string message)
+    {
+        MessageBox.Show(message, I18n.Text("app.name"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+        Environment.ExitCode = 1;
+    }
+
     public static async Task RunAsync(WebApplication app, int port)
     {
         await using (app)
