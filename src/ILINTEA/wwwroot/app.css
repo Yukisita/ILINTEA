@@ -91,7 +91,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .about-content { display: grid; grid-template-columns: minmax(0, 280px) minmax(0, 1fr); align-items: center; gap: 24px; padding: 24px; font-size: 14px; line-height: 1.7; }
 .about-illustration { display: block; width: 100%; height: auto; }
 .about-copy { min-width: 0; }
-.about-name { margin: 0 0 12px; font-size: 22px; font-weight: 700; white-space: pre-line; }
+.about-name { margin: 0 0 4px; font-size: 22px; font-weight: 700; white-space: pre-line; }
+.about-version { margin: 0 0 12px; }
+.about-version:empty { display: none; }
 .about-full-name { margin: 0 0 16px; color: var(--muted); }
 .about-license { margin: 0; font-size: 13px; color: var(--muted); }
 .about-license a { color: var(--accent); }

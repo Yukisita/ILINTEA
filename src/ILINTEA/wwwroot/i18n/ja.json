@@ -4,6 +4,8 @@
   "about.title": "アプリ情報",
   "about.name": "ILINTEA\nイリンテア",
   "about.fullName": "Integrated Live Information Terminal Application",
+  "about.version": "バージョン {version}",
+  "about.versionUnavailable": "バージョンを取得できませんでした",
   "about.licenses": "ライセンス・著作権情報",
   "about.copyright": "Copyright (c) 2026 S.Yukisita",
   "about.illustrationAlt": "マイクとノートパソコンを使い、足を揃えて座って配信する雪下雪菜のイラスト",
