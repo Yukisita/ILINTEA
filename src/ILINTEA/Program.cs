@@ -225,14 +225,19 @@ app.MapGet("/view/", (IWebHostEnvironment environment) =>
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     starting = false;
+#if !WINDOWS
     Console.WriteLine("ILINTEA");
     Console.WriteLine($"  Local:   http://localhost:{port}/");
     if (ViewerLink.FindLanAddress() is { } address)
         Console.WriteLine($"  Network: http://{address}:{port}/");
     Console.WriteLine();
     Console.WriteLine("Press Ctrl+C to stop.");
+#endif
 });
 
+#if WINDOWS
+await TrayApplication.RunAsync(app, port);
+#else
 try
 {
     await app.RunAsync();
@@ -248,6 +253,7 @@ catch (Exception exception) when (starting && GetPortError(exception) is { } err
         Console.ReadLine();
     }
 }
+#endif
 
 // A receive must stay active to observe close frames and keep-alive responses, even on an idle board.
 static async Task WaitForSocketCloseAsync(WebSocket socket, CancellationTokenSource cancellation)
@@ -288,6 +294,7 @@ static async Task<IResult> SaveImage(Guid? id, IFormFile file, BoardStore board,
         : Results.BadRequest(I18n.Error("errors.elementLimit"));
 }
 
+#if !WINDOWS
 static string? GetPortError(Exception exception)
 {
     for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
@@ -299,3 +306,4 @@ static string? GetPortError(Exception exception)
     }
     return null;
 }
+#endif

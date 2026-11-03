@@ -1,6 +1,9 @@
 {
   "app.name": "ILINTEA",
   "app.brand": "ILINTEA",
+  "tray.openEditor": "Web管理画面を開く",
+  "tray.exit": "ILINTEAを終了",
+  "tray.browserError": "既定のブラウザーを開けませんでした。次のURLをブラウザーで開いてください。",
   "about.title": "アプリ情報",
   "about.name": "ILINTEA\nイリンテア",
   "about.fullName": "Integrated Live Information Terminal Application",

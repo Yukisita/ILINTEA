@@ -1,6 +1,9 @@
 {
   "app.name": "ILINTEA",
   "app.brand": "ILINTEA",
+  "tray.openEditor": "Open web editor",
+  "tray.exit": "Exit ILINTEA",
+  "tray.browserError": "Could not open the default browser. Open the following URL in your browser.",
   "about.title": "About",
   "about.name": "ILINTEA",
   "about.fullName": "Integrated Live Information Terminal Application",
