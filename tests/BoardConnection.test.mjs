@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { connectBoardEvents } from '../wwwroot/board-connection.js';
+import { connectBoardEvents } from '../src/ILINTEA/wwwroot/board-connection.js';
 
 function setup(failures = 0) {
     const page = new EventTarget();

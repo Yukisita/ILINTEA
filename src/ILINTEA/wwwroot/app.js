@@ -33,7 +33,6 @@ let scriptBusy = false;
 let scriptLoadingId = null;
 let imageBusy = false;
 let displayBusy = false;
-let deleteConfirmId = null;
 let canvasSaving = false;
 let orderBusy = false;
 let addBusy = false;
@@ -129,13 +128,11 @@ function orderActionBusy() {
 
 function queuePatch(id, patch) {
     if (!connected || settingsBusy || canvasSaving || scriptLoadingId === id || !state.elements.some((element) => element.id === id)) return;
-    if (deleteConfirmId === id) deleteConfirmId = null;
     editSync.queue(id, patch);
 }
 
 function select(id) {
     if (id !== selectedId) {
-        deleteConfirmId = null;
         alarmFormDirty = false;
         shownAlarmId = null;
         document.querySelector('.property-editor').scrollTop = 0;
@@ -414,12 +411,9 @@ function renderDisplayControls() {
     }
     for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || onProgram;
     $('toggle-visibility').disabled = busy;
-    $('toggle-visibility').classList.toggle('primary', !onProgram);
+    $('toggle-visibility').setAttribute('aria-pressed', String(onProgram));
     $('cancel-display').disabled = busy;
     $('delete-element').disabled = busy;
-    $('confirm-delete').disabled = busy;
-    $('delete-element').hidden = deleteConfirmId === element.id;
-    $('delete-confirmation').hidden = deleteConfirmId !== element.id;
     $('cancel-display').hidden = !waiting;
     $('toggle-visibility').textContent = t(onProgram ? 'display.hide'
         : waiting ? 'display.showCancelSchedule' : alarm ? 'alarm.start' : 'display.show');
@@ -764,7 +758,6 @@ async function uploadSettings(file) {
             method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file
         });
         selectedId = null;
-        deleteConfirmId = null;
         alarmFormDirty = false;
         shownAlarmId = null;
         acceptState(snapshot);
@@ -923,29 +916,27 @@ if (!viewer) {
         if (input.tagName === 'TEXTAREA') input.addEventListener('compositionend', update);
         input.addEventListener('blur', () => setTimeout(renderProperties, 0));
     }
-    $('delete-element').addEventListener('click', () => {
-        deleteConfirmId = selectedId;
-        renderDisplayControls();
-        $('cancel-delete').focus();
-    });
-    $('cancel-delete').addEventListener('click', () => {
-        deleteConfirmId = null;
-        renderDisplayControls();
-        $('delete-element').focus();
-    });
-    $('confirm-delete').addEventListener('click', async () => {
-        const element = selectedElement();
-        if (!element || element.id !== deleteConfirmId || displayActionBusy(element.id)) return;
+    $('delete-element').addEventListener('click', async () => {
+        // Match Program visibility, which excludes unsent preview edits and future schedules.
+        const element = state.elements.find((item) => item.id === selectedId);
+        if (!element || displayActionBusy(element.id)) return;
+        const wasVisible = elementIsVisible(element);
+        if (wasVisible && !window.confirm(t('delete.confirmation'))) return;
+        if (displayActionBusy(element.id)) return;
         const id = element.id;
         displayBusy = true;
         renderDisplayControls();
         editSync.discard(id);
         try {
             if (!await flushEdits()) return;
+            // A schedule or another editor may have shown it while earlier edits were finishing.
+            const current = state.elements.find((item) => item.id === id);
+            if (!wasVisible && current && elementIsVisible(current)
+                && !window.confirm(t('delete.confirmation'))) return;
             await request(`/api/elements/${id}`, { method: 'DELETE' });
             await refreshBoard();
         } catch (error) { notify(error.message); }
-        finally { displayBusy = false; deleteConfirmId = null; renderDisplayControls(); }
+        finally { displayBusy = false; renderDisplayControls(); }
     });
     $('stage').addEventListener('pointerdown', (event) => {
         if (event.target === $('stage')) select(null);
@@ -980,7 +971,18 @@ settingsDialog.addEventListener('pointerdown', event => {
         settingsDialog.close();
 });
 
-$('open-about').addEventListener('click', () => $('about-dialog').showModal());
+$('open-about').addEventListener('click', async () => {
+    const versionLine = $('about-version');
+    versionLine.textContent = '';
+    $('about-licenses').href = withLanguage('/licenses.html');
+    $('about-dialog').showModal();
+    try {
+        const { version } = await request('/api/app-info', { cache: 'no-store' });
+        versionLine.textContent = t('about.version', { version });
+    } catch {
+        versionLine.textContent = t('about.versionUnavailable');
+    }
+});
 
 $('language').value = locale;
 $('language').addEventListener('change', async (event) => {

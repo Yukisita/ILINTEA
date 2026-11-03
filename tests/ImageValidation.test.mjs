@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canDecodeImage } from '../wwwroot/image-validation.js';
+import { canDecodeImage } from '../src/ILINTEA/wwwroot/image-validation.js';
 
 function mockDecoder(t, { width = 16, height = 16, fail = false } = {}) {
     const calls = [];
