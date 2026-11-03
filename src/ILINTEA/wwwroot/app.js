@@ -971,7 +971,10 @@ settingsDialog.addEventListener('pointerdown', event => {
         settingsDialog.close();
 });
 
-$('open-about').addEventListener('click', () => $('about-dialog').showModal());
+$('open-about').addEventListener('click', () => {
+    $('about-licenses').href = withLanguage('/licenses.html');
+    $('about-dialog').showModal();
+});
 
 $('language').value = locale;
 $('language').addEventListener('change', async (event) => {
