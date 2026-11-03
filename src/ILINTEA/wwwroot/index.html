@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261102-element-deletion">
-  <script type="module" src="/app.js?v=20261102-element-deletion"></script>
+  <link rel="stylesheet" href="/app.css?v=20261103-app-info">
+  <script type="module" src="/app.js?v=20261103-app-info"></script>
 </head>
 <body>
   <header class="navbar">
@@ -142,14 +142,11 @@
       <img class="about-illustration" src="/images/about-character.png" width="1254" height="1254" loading="lazy" decoding="async" alt="" data-i18n-alt="about.illustrationAlt">
       <div class="about-copy">
         <p class="about-name" data-i18n="about.name"></p>
+        <p class="about-version" id="about-version" role="status"></p>
         <p class="about-full-name" data-i18n="about.fullName"></p>
-        <p class="about-license" lang="en">
-          <a href="/LICENSE" target="_blank" rel="noopener" data-i18n="about.license"></a><br>
-          <span data-i18n="about.copyright"></span><br>
-          <a href="/THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener" data-i18n="about.thirdPartyNotices"></a><br>
-          <a href="/licenses/SkiaSharp/LICENSE.txt" target="_blank" rel="noopener">SkiaSharp license</a><br>
-          <a href="/licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener">SkiaSharp third-party notices</a><br>
-          <a href="/licenses/SkiaSharp/ADDITIONAL-NOTICES.txt" target="_blank" rel="noopener">SkiaSharp additional notices</a>
+        <p class="about-license">
+          <span lang="en" data-i18n="about.copyright"></span><br>
+          <a id="about-licenses" href="/licenses.html" target="_blank" rel="noopener" data-i18n="about.licenses"></a>
         </p>
       </div>
     </div>

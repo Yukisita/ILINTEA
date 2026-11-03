@@ -30,6 +30,7 @@ builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLi
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = UploadLimits.MaxRequestBodyBytes);
 var app = builder.Build();
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+var version = typeof(Program).Assembly.GetName().Version!.ToString();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -49,6 +50,7 @@ foreach (var noticeFile in new[] { "LICENSE.txt", "THIRD-PARTY-NOTICES.txt", "AD
         Path.Combine(app.Environment.ContentRootPath, "licenses", "SkiaSharp", noticeFile), "text/plain; charset=utf-8"));
 }
 
+app.MapGet("/api/app-info", () => new { version });
 app.MapGet("/api/board", (BoardStore board) => board.Snapshot());
 app.MapPost("/api/highlight", (BoardStore board) => board.HighlightScreen());
 app.MapDelete("/api/highlight/{id:guid}", (Guid id, BoardStore board) =>

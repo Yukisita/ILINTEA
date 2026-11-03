@@ -971,7 +971,18 @@ settingsDialog.addEventListener('pointerdown', event => {
         settingsDialog.close();
 });
 
-$('open-about').addEventListener('click', () => $('about-dialog').showModal());
+$('open-about').addEventListener('click', async () => {
+    const versionLine = $('about-version');
+    versionLine.textContent = '';
+    $('about-licenses').href = withLanguage('/licenses.html');
+    $('about-dialog').showModal();
+    try {
+        const { version } = await request('/api/app-info', { cache: 'no-store' });
+        versionLine.textContent = t('about.version', { version });
+    } catch {
+        versionLine.textContent = t('about.versionUnavailable');
+    }
+});
 
 $('language').value = locale;
 $('language').addEventListener('change', async (event) => {
