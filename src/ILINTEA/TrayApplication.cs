@@ -12,7 +12,7 @@ internal static class TrayApplication
     public static Mutex? AcquireInstance()
     {
         // Keep the named handle alive until this Windows session's instance exits.
-        var instance = new Mutex(false, @"Local\ILINTEA.SingleInstance.33F2B568-191D-4B74-8B53-F6EC877ABF53", out var created);
+        var instance = new Mutex(false, @"Local\ILINTEA.SingleInstance.F61FF7B4-34C6-4826-BA0C-60D52A9EF398", out var created);
         if (created) return instance;
 
         instance.Dispose();
