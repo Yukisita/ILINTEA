@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.Net;
 using System.Windows.Forms;
 
 namespace ILINTEA;
@@ -34,7 +35,7 @@ internal static class TrayApplication
             var shutdown = app.WaitForShutdownAsync();
             try
             {
-                await RunMessageLoopAsync(app.Lifetime, $"http://127.0.0.1:{port}/");
+                await RunMessageLoopAsync(app.Lifetime, port);
             }
             finally
             {
@@ -44,14 +45,14 @@ internal static class TrayApplication
         }
     }
 
-    private static Task RunMessageLoopAsync(IHostApplicationLifetime lifetime, string editorUrl)
+    private static Task RunMessageLoopAsync(IHostApplicationLifetime lifetime, int port)
     {
         var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
         {
             try
             {
-                RunMessageLoop(lifetime, editorUrl);
+                RunMessageLoop(lifetime, port);
                 completed.SetResult();
             }
             catch (Exception exception)
@@ -64,14 +65,14 @@ internal static class TrayApplication
         return completed.Task;
     }
 
-    private static void RunMessageLoop(IHostApplicationLifetime lifetime, string editorUrl)
+    private static void RunMessageLoop(IHostApplicationLifetime lifetime, int port)
     {
         ApplicationConfiguration.Initialize();
         using var context = new ApplicationContext();
         using var menu = new ContextMenuStrip();
         var open = menu.Items.Add(I18n.Text("tray.openEditor"));
         var exit = menu.Items.Add(I18n.Text("tray.exit"));
-        open.Click += (_, _) => OpenEditor(editorUrl);
+        open.Click += (_, _) => OpenEditor(port);
         exit.Click += (_, _) =>
         {
             open.Enabled = false;
@@ -94,8 +95,10 @@ internal static class TrayApplication
         Application.Run(context);
     }
 
-    private static void OpenEditor(string editorUrl)
+    private static void OpenEditor(int port)
     {
+        var address = ViewerLink.FindLanAddress() ?? IPAddress.Loopback;
+        var editorUrl = $"http://{address}:{port}/";
         try
         {
             using var browser = Process.Start(new ProcessStartInfo(editorUrl) { UseShellExecute = true });
