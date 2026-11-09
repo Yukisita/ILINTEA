@@ -25,6 +25,25 @@ Run("Partial patches retain placement and unrelated properties", () =>
     Equal(original with { Text = "updated" }, updated);
 });
 
+Run("New text, clocks and alarms enable auto-fit; toggling retains manual size and placement", () =>
+{
+    var board = new BoardStore();
+    foreach (var kind in new[] { "text", "clock", "alarm", "script", "image" })
+    {
+        var original = board.Add(kind)!;
+        var supported = kind is "text" or "clock" or "alarm";
+        Equal(supported, original.AutoFit);
+        var manual = board.Update(original.Id, Patch() with { FontSize = 96, AutoFit = false })!;
+        Equal(original with { FontSize = 96, AutoFit = false }, manual);
+        var automatic = board.Update(original.Id, Patch() with { AutoFit = true })!;
+        Equal(manual with { AutoFit = supported }, automatic);
+        var edited = board.Update(original.Id, Patch(text: "updated"))!;
+        Equal(automatic with { Text = "updated" }, edited);
+        var disabled = board.Update(original.Id, Patch() with { AutoFit = false })!;
+        Equal(edited with { AutoFit = false }, disabled);
+    }
+});
+
 Run("Clock display settings default to 24-hour with seconds and remain independent per element", () =>
 {
     var board = new BoardStore();

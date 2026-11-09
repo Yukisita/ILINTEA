@@ -4,7 +4,7 @@ public record Element(Guid Id, string Kind, double X, double Y, double Width, do
     string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
     ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null, string CountdownText = "",
     long ImageRevision = 0, AlarmSchedule? AlarmSchedule = null,
-    int ClockHourFormat = 24, bool ClockShowSeconds = true)
+    int ClockHourFormat = 24, bool ClockShowSeconds = true, bool AutoFit = false)
 {
     public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}?v={ImageRevision}" : null;
 }

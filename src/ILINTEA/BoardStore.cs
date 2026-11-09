@@ -112,7 +112,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 "alarm" => new Element(Guid.NewGuid(), kind, 80, 520, 960, 160,
                     text ?? "", 40, "#332701", CountdownText: countdownText ?? ""),
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "", 56)
-            }) with { Visible = false };
+            }) with { Visible = false, AutoFit = kind is "text" or "clock" or "alarm" };
             element = ScaleElement(element, canvas.Width / 1280, canvas.Height / 720);
             elements.Insert(0, element);
             if (image is not null) images.Add(element.Id, image);
@@ -138,6 +138,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 Height = patch.Height ?? current.Height,
                 Text = patch.Text ?? current.Text,
                 FontSize = patch.FontSize ?? current.FontSize,
+                AutoFit = current.Kind is "text" or "clock" or "alarm" && (patch.AutoFit ?? current.AutoFit),
                 Color = patch.Color ?? current.Color,
                 Align = patch.Align ?? current.Align,
                 Visible = patch.Visible ?? current.Visible,
