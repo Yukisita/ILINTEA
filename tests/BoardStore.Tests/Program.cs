@@ -263,6 +263,7 @@ Run("Every element kind supports replacing and canceling a display schedule", ()
         Assert(first.Visible, "Scheduled display was not enabled");
         Equal(clock.Now.AddSeconds(10), first.DisplaySchedule!.At);
         if (kind == "alarm") Equal(clock.Now.AddMinutes(1), first.AlarmSchedule!.At);
+        if (kind == "alarm") Equal<DateTimeOffset?>(clock.Now, first.AlarmSchedule!.CreatedAt);
         else Equal<AlarmSchedule?>(null, first.AlarmSchedule);
         var updated = board.ScheduleDisplay(id, 20, clock.Now.AddMinutes(2))!;
         Equal(clock.Now.AddSeconds(20), updated.DisplaySchedule!.At);
@@ -350,6 +351,7 @@ Run("Alarms reject past and current times and remain cancelable after starting",
     Equal<Element?>(null, board.ScheduleAlarm(id, new(clock.Now)));
     var scheduled = board.ScheduleAlarm(id, new(clock.Now.AddSeconds(10).ToOffset(TimeSpan.FromHours(9))))!;
     Equal(clock.Now.AddSeconds(10), scheduled.AlarmSchedule!.At);
+    Equal<DateTimeOffset?>(clock.Now, scheduled.AlarmSchedule.CreatedAt);
     Equal(TimeSpan.Zero, scheduled.AlarmSchedule.At.Offset);
     clock.Now += TimeSpan.FromSeconds(10);
     Assert(board.CancelAlarm(id, scheduled.AlarmSchedule.Id), "Started alarm was not canceled");

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createClockFormatter } from '../src/ILINTEA/wwwroot/clock-format.js';
+import { createClockFormatter, clockFitSamples } from '../src/ILINTEA/wwwroot/clock-format.js';
 
 const afternoon = new Date(2026, 9, 28, 21, 4, 5);
 
@@ -33,4 +33,24 @@ test('day periods follow the selected display language', () => {
     assert.equal(format({ clockHourFormat: 12 }, afternoon), '午後09:04:05');
     assert.equal(format({ clockHourFormat: 12, clockShowSeconds: false }, afternoon), '午後09:04');
     assert.equal(format({}, afternoon), '21:04:05');
+});
+
+test('clock fitting covers every hour and both day periods in every supported format and language', () => {
+    for (const locale of ['ja', 'en'])
+    for (const clockHourFormat of [12, 24])
+    for (const clockShowSeconds of [true, false]) {
+        const element = { clockHourFormat, clockShowSeconds };
+        const samples = clockFitSamples(element, locale);
+        assert.equal(samples.length, 24);
+        assert.ok(samples.every(text => (text.match(/:/g) || []).length === (clockShowSeconds ? 2 : 1)));
+        if (clockHourFormat === 12) {
+            const [morning, afternoon] = locale === 'ja' ? ['午前', '午後'] : ['AM', 'PM'];
+            assert.ok(samples.some(text => text.includes(morning)));
+            assert.ok(samples.some(text => text.includes(afternoon)));
+            assert.ok(samples.some(text => text.includes('12:')));
+        } else {
+            assert.ok(samples.some(text => text.startsWith('00:')));
+            assert.ok(samples.some(text => text.startsWith('23:')));
+        }
+    }
 });
