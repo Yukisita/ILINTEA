@@ -14,3 +14,9 @@ export function createClockFormatter(locale) {
         return formatters.get(key).format(time);
     };
 }
+
+export function clockFitSamples(element, locale) {
+    const format = createClockFormatter(locale);
+    // Clock numerals are tabular. All hours cover both localized day periods.
+    return Array.from({ length: 24 }, (_, hour) => format(element, new Date(2026, 0, 1, hour, 58, 58)));
+}

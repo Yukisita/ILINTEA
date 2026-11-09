@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
-  <link rel="stylesheet" href="/app.css?v=20261103-app-info">
-  <script type="module" src="/app.js?v=20261109-hide-display-schedule"></script>
+  <link rel="stylesheet" href="/app.css?v=20261109-auto-fit">
+  <script type="module" src="/app.js?v=20261109-auto-fit"></script>
 </head>
 <body>
   <header class="navbar">
@@ -74,6 +74,7 @@
               <p id="script-status" class="muted" role="status"></p>
             </div>
             <div id="type-fields">
+              <label id="auto-fit-field" class="auto-fit-field" for="auto-fit"><input id="auto-fit" type="checkbox"><span data-i18n="properties.autoFit"></span></label>
               <div class="field-row"><label for="font-size" data-i18n="properties.fontSize"></label><input id="font-size" type="number" min="12" max="160"></div>
               <div class="field-row"><label for="color" data-i18n="properties.color"></label><input id="color" type="color"></div>
               <div class="field-row"><label for="align" data-i18n="properties.align"></label><select id="align"><option value="left" data-i18n="properties.alignLeft"></option><option value="center" data-i18n="properties.alignCenter"></option><option value="right" data-i18n="properties.alignRight"></option></select></div>

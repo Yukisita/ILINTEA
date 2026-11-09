@@ -227,7 +227,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
             {
                 Visible = true, DisplaySchedule = schedule, Playback = playback,
                 AlarmSchedule = element.Kind == "alarm"
-                    ? new(Guid.NewGuid(), alarmAt!.Value.ToUniversalTime()) : element.AlarmSchedule
+                    ? new(Guid.NewGuid(), alarmAt!.Value.ToUniversalTime(), now) : element.AlarmSchedule
             };
         });
 
@@ -244,11 +244,12 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
     public Element? ScheduleAlarm(Guid id, ScheduleAlarm request) =>
         UpdateElement(id, element =>
         {
-            if (request.At <= clock.GetUtcNow()) return null;
+            var now = clock.GetUtcNow();
+            if (request.At <= now) return null;
             return element with
             {
                 Visible = true,
-                AlarmSchedule = new(Guid.NewGuid(), request.At.ToUniversalTime())
+                AlarmSchedule = new(Guid.NewGuid(), request.At.ToUniversalTime(), now)
             };
         }, kind: "alarm");
 

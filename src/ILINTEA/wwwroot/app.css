@@ -147,6 +147,8 @@ body:not(.viewer) .monitor .stage-host { border: 0; border-radius: 0; padding: 1
 .stage { position: absolute; width: 1280px; height: 720px; left: 0; top: 0; background: #000; transform-origin: top left; overflow: hidden; color: #fff; }
 .element { position: absolute; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
 .element-content { width: 100%; height: 100%; overflow: hidden; }
+.auto-fit-measure { position: fixed; left: 0; top: 0; visibility: hidden; pointer-events: none; contain: layout style paint; }
+.element-alarm.auto-fit .alarm-remaining { white-space: nowrap; }
 .script-text { width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .script-controls { flex-wrap: wrap; margin-top: 8px; }
 .script-controls button { --control-padding: 8px; flex: 1; min-width: 0; }
@@ -199,6 +201,8 @@ input:not([type="range"]), select { height: var(--control-height); font-size: va
 input:disabled, select:disabled, textarea:disabled { background: #e9ecef; color: var(--muted); opacity: 1; }
 textarea { resize: vertical; margin: 8px 0 16px; font-size: 14px; line-height: 1.6; }
 .field-row { display: grid; grid-template-columns: 1fr 120px; gap: 10px; align-items: center; margin-bottom: 14px; }
+.auto-fit-field { display: flex; grid-column: 1 / -1; align-items: center; gap: 8px; margin-bottom: 14px; }
+.auto-fit-field input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--accent); }
 input[type="color"] { padding: 4px; }
 h3 { font-size: 13px; margin: 20px 0 12px; border-top: 1px solid var(--border); padding-top: 18px; font-weight: 500; }
 .position-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -261,6 +265,7 @@ body:not(.viewer) .notice { position: fixed; z-index: 200; top: 58px; left: 50%;
   .script-controls { margin-top: 4px; }
   #script-status { margin: 6px 0 0; font-size: 12px; line-height: 1.5; }
   #type-fields { display: grid; grid-template-columns: 1fr 64px 1fr; gap: 10px; }
+  .auto-fit-field { margin: 0; }
   .field-row { display: flex; flex-direction: column; align-items: stretch; gap: 5px; margin: 0; }
   .properties h3 { margin: 10px 0 8px; padding-top: 8px; font-weight: 600; }
   .position-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }

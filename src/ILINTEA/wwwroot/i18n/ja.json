@@ -84,6 +84,7 @@
   "properties.selectionEmpty": "要素一覧から選ぶと、\n内容・位置・表示を変更できます。",
   "properties.text": "テキスト内容",
   "properties.fontSize": "文字サイズ",
+  "properties.autoFit": "文字サイズを自動調整",
   "properties.color": "文字色",
   "properties.align": "文字揃え",
   "properties.alignLeft": "左揃え",
