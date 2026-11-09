@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework Condition="('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOSPlatform('Windows'))) Or $([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))">net10.0-windows</TargetFramework>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -10,9 +11,14 @@
     <!-- Keep the reviewed managed and native packages reproducible. Updating requires an explicit lock refresh. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RestoreLockedMode>true</RestoreLockedMode>
+    <NuGetLockFilePath Condition="'$(TargetFramework)' == 'net10.0-windows'">$(MSBuildProjectDirectory)/packages.windows.lock.json</NuGetLockFilePath>
     <NuGetLockFilePath Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(RuntimeIdentifiers)' == 'win-x64'">$(MSBuildProjectDirectory)/packages.win-x64.lock.json</NuGetLockFilePath>
     <!-- Serve the copied wwwroot in every configuration without source-tree manifests. -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="[4.153.1]" />
