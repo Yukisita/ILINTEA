@@ -409,6 +409,7 @@ function renderDisplayControls() {
                 ? new Date(element.alarmSchedule.at) : new Date(Date.now() + serverOffset + 5 * 60_000));
         }
     }
+    $('display-schedule-fields').hidden = onProgram;
     for (const id of ['display-delay', 'display-unit', 'schedule-display']) $(id).disabled = busy || onProgram;
     $('toggle-visibility').disabled = busy;
     $('toggle-visibility').setAttribute('aria-pressed', String(onProgram));

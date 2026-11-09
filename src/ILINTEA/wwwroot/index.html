@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="app.name"></title>
   <link rel="stylesheet" href="/app.css?v=20261103-app-info">
-  <script type="module" src="/app.js?v=20261103-app-info"></script>
+  <script type="module" src="/app.js?v=20261109-hide-display-schedule"></script>
 </head>
 <body>
   <header class="navbar">
@@ -96,8 +96,8 @@
               <div id="display-schedule-fields" class="display-schedule">
                 <label for="display-delay" data-i18n="display.delayLabel"></label>
                 <div class="delay-inputs"><input id="display-delay" data-i18n-aria-label="display.delayAria" type="number" min="1" max="86400" step="1" value="10"><select id="display-unit" data-i18n-aria-label="display.unit"><option value="1" data-i18n="display.seconds"></option><option value="60" data-i18n="display.minutes"></option></select><button id="schedule-display" type="button" data-i18n="display.schedule"></button></div>
+                <div class="schedule-status"><p id="display-status" class="muted"></p><button id="cancel-display" type="button" hidden data-i18n="display.cancelSchedule"></button></div>
               </div>
-              <div class="schedule-status"><p id="display-status" class="muted"></p><button id="cancel-display" type="button" hidden data-i18n="display.cancelSchedule"></button></div>
             </div>
             <div class="visibility-actions"><button id="toggle-visibility" type="button" aria-pressed="false" aria-describedby="display-state" data-i18n="display.show"></button></div>
           </section>
