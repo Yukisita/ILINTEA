@@ -7,7 +7,7 @@ import { getAlarmState } from '/alarm-state.js?v=20261017';
 import { displayIsWaiting as isWaiting, elementIsVisible as isVisible } from '/display-state.js?v=20261017';
 import { preventSamePageNavigation } from '/navigation.js?v=20261026';
 import { createClockFormatter } from '/clock-format.js?v=20261109-auto-fit';
-import { createAutoFitter } from '/auto-fit.js?v=20261109';
+import { createAutoFitter } from '/auto-fit.js?v=20261110-glyph-center';
 
 await initializeI18n();
 preventSamePageNavigation(document.querySelectorAll('.brand, .mode-tabs a'));
@@ -150,6 +150,11 @@ function createElementNode(element, editable) {
     node.dataset.id = element.id;
     const content = document.createElement('div');
     content.className = 'element-content';
+    if (element.kind === 'text') {
+        const text = document.createElement('div');
+        text.className = 'text-body';
+        content.append(text);
+    }
     if (element.kind === 'script') {
         const script = document.createElement('div');
         script.className = 'script-text';
@@ -201,7 +206,7 @@ function renderElement(node, element, editable, limits, layer) {
     node.style.color = element.color;
     node.style.textAlign = element.align;
     node.classList.toggle('selected', editable && element.id === selectedId);
-    if (element.kind === 'text') node.firstElementChild.textContent = element.text;
+    if (element.kind === 'text') node.firstElementChild.firstElementChild.textContent = element.text;
     if (element.kind === 'image') {
         const image = node.firstElementChild.firstElementChild;
         if (image.getAttribute('src') !== element.imageUrl) image.src = element.imageUrl;

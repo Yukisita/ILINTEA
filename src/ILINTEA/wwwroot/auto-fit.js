@@ -1,6 +1,7 @@
 import { clockFitSamples } from './clock-format.js?v=20261109-auto-fit';
 
 export const minimumFontSize = 12;
+let textMetricsContext;
 
 // Search integer CSS pixels; the manual font-size limit does not apply here.
 export function fittedFontSize(maximum, fits) {
@@ -28,29 +29,34 @@ export function createAutoFitter() {
     return {
         clear() { cache = new WeakMap(); },
         fit(node, element, { locale, alarm } = {}) {
-            const enabled = element.autoFit === true && ['text', 'clock', 'alarm'].includes(element.kind);
+            const supported = ['text', 'clock', 'alarm'].includes(element.kind);
+            const enabled = element.autoFit === true && supported;
             node.classList.toggle('auto-fit', enabled);
-            if (!enabled) {
+            if (!supported) {
                 node.style.fontSize = `${element.fontSize}px`;
                 cache.delete(node);
                 return;
             }
             const timer = alarm ? alarmFitSample(element, alarm) : '';
-            const key = JSON.stringify([element.kind, element.width, element.height, element.align, locale,
+            const key = JSON.stringify([element.kind, element.width, element.height, element.align, locale, enabled,
+                enabled ? null : element.fontSize,
                 element.kind === 'text' ? element.text : null,
                 element.clockHourFormat, element.clockShowSeconds, alarm?.phase, alarm?.message, timer]);
             let result = cache.get(node);
             if (result?.key !== key) {
-                result = { key, size: measureFontSize(node, element, locale, alarm, timer) };
+                result = { key, ...(enabled || element.kind === 'text'
+                    ? measureLayout(node, element, locale, alarm, timer, enabled)
+                    : { size: element.fontSize, offset: 0 }) };
                 cache.set(node, result);
             }
             node.style.fontSize = `${result.size}px`;
+            if (element.kind === 'text') node.firstElementChild.firstElementChild.style.transform = `translateY(${result.offset}px)`;
         }
     };
 }
 
-function measureFontSize(node, element, locale, alarm, timer) {
-    if (element.kind === 'text' && element.text === '') return minimumFontSize;
+function measureLayout(node, element, locale, alarm, timer, automatic) {
+    if (element.kind === 'text' && element.text === '') return { size: automatic ? minimumFontSize : element.fontSize, offset: 0 };
     // Measure outside the scaled stage, including when the real element is hidden.
     const probe = document.createElement('div');
     probe.className = `element element-${element.kind} auto-fit auto-fit-measure`;
@@ -62,7 +68,11 @@ function measureFontSize(node, element, locale, alarm, timer) {
     probe.inert = true;
     const content = node.firstElementChild.cloneNode(true);
     content.style.height = 'auto';
+    // Measure all lines before the visible viewport clips or centers them.
+    content.style.maxHeight = 'none';
     content.style.overflow = 'visible';
+    const textBody = element.kind === 'text' ? content.firstElementChild : null;
+    if (textBody) textBody.style.transform = 'none';
     probe.append(content);
     if (alarm) {
         content.firstElementChild.textContent = timer;
@@ -95,7 +105,7 @@ function measureFontSize(node, element, locale, alarm, timer) {
             }
             if (content.getBoundingClientRect().height > height || content.scrollWidth > content.clientWidth) return false;
             // Check text itself too: scrollWidth/clientWidth round to whole pixels.
-            const targets = alarm ? [...content.children] : [content];
+            const targets = alarm ? [...content.children] : [textBody ?? content];
             return targets.every(target => {
                 const range = document.createRange();
                 range.selectNodeContents(target);
@@ -103,8 +113,52 @@ function measureFontSize(node, element, locale, alarm, timer) {
             });
         };
         // Every nonempty line has a line-height of at least 1 in these element styles.
-        return fittedFontSize(element.height, fits);
+        const size = automatic ? fittedFontSize(element.height, fits) : element.fontSize;
+        probe.style.fontSize = `${size}px`;
+        const offset = textBody && textBody.getBoundingClientRect().height <= height ? glyphCenterOffset(textBody) : 0;
+        return { size, offset };
     } finally {
         probe.remove();
     }
+}
+
+function glyphCenterOffset(body) {
+    const textNode = body.firstChild;
+    const text = textNode?.textContent;
+    if (!text || !text.trim()) return 0;
+    const style = getComputedStyle(body);
+    const context = textMetricsContext ??= document.createElement('canvas').getContext('2d');
+    if (!context) return 0;
+    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    context.fontKerning = style.fontKerning;
+    const range = document.createRange();
+    const bounds = body.getBoundingClientRect();
+    const lineTopAt = index => {
+        range.setStart(textNode, index);
+        range.setEnd(textNode, index + 1);
+        return range.getBoundingClientRect().top;
+    };
+    let top = Infinity, bottom = -Infinity;
+    // Find actual wrapped lines without modifying the text or breaking ligatures.
+    for (let start = 0; start < text.length;) {
+        const lineTop = lineTopAt(start);
+        let low = start + 1, high = text.length;
+        while (low < high) {
+            const middle = Math.floor((low + high) / 2);
+            if (lineTopAt(middle) <= lineTop + .1) low = middle + 1;
+            else high = middle;
+        }
+        const line = text.slice(start, low).replace(/[\r\n]/g, '');
+        if (line.trim()) {
+            const metrics = context.measureText(line);
+            if (!Number.isFinite(metrics.fontBoundingBoxAscent)) return 0;
+            // Range bounds describe the font cell; canvas provides the ink extents
+            // relative to its alphabetic baseline, including accents and descenders.
+            const baseline = lineTop - bounds.top + metrics.fontBoundingBoxAscent;
+            top = Math.min(top, baseline - metrics.actualBoundingBoxAscent);
+            bottom = Math.max(bottom, baseline + metrics.actualBoundingBoxDescent);
+        }
+        start = low;
+    }
+    return Number.isFinite(top) && Number.isFinite(bottom) ? (bounds.height - top - bottom) / 2 : 0;
 }
