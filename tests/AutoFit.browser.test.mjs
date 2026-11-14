@@ -1,10 +1,60 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { inflateSync } from 'node:zlib';
+
+// Inspect the actual browser raster, not DOM line boxes. Chromium screenshots
+// use non-interlaced, 8-bit RGB/RGBA PNGs; decode them without another dependency.
+function inkMargins(png) {
+    let width, height, channels;
+    const chunks = [];
+    for (let offset = 8; offset < png.length;) {
+        const length = png.readUInt32BE(offset);
+        const type = png.toString('ascii', offset + 4, offset + 8);
+        const data = png.subarray(offset + 8, offset + 8 + length);
+        if (type === 'IHDR') {
+            width = data.readUInt32BE(0); height = data.readUInt32BE(4);
+            assert.equal(data[8], 8); assert.equal(data[12], 0);
+            assert.ok([2, 6].includes(data[9]));
+            channels = data[9] === 6 ? 4 : 3;
+        }
+        if (type === 'IDAT') chunks.push(data);
+        offset += length + 12;
+    }
+    const encoded = inflateSync(Buffer.concat(chunks));
+    const stride = width * channels;
+    const pixels = Buffer.alloc(stride * height);
+    const paeth = (a, b, c) => {
+        const p = a + b - c;
+        const da = Math.abs(p - a), db = Math.abs(p - b), dc = Math.abs(p - c);
+        return da <= db && da <= dc ? a : db <= dc ? b : c;
+    };
+    let input = 0, top = height, bottom = -1;
+    for (let y = 0; y < height; y++) {
+        const filter = encoded[input++];
+        for (let x = 0; x < stride; x++) {
+            const index = y * stride + x;
+            const left = x >= channels ? pixels[index - channels] : 0;
+            const up = y ? pixels[index - stride] : 0;
+            const corner = y && x >= channels ? pixels[index - stride - channels] : 0;
+            const predictor = [0, left, up, Math.floor((left + up) / 2), paeth(left, up, corner)][filter];
+            assert.notEqual(predictor, undefined);
+            pixels[index] = (encoded[input++] + predictor) & 255;
+        }
+        for (let x = 0; x < width; x++) {
+            const index = y * stride + x * channels;
+            if (Math.max(pixels[index], pixels[index + 1], pixels[index + 2]) > 100) {
+                top = Math.min(top, y); bottom = y;
+            }
+        }
+    }
+    assert.ok(bottom >= top, 'No visible text in the screenshot');
+    return { top, bottom: height - bottom - 1 };
+}
 
 // Optional real-layout checks: install Playwright, or point ILINTEA_PLAYWRIGHT_PATH
 // at an existing installation. ILINTEA_BROWSER_PATH can select a local browser.
@@ -176,6 +226,88 @@ test('auto-fit in Preview, Program and the viewer', { skip: !chromium, timeout: 
         await editor.waitForFunction(({ selector, before }) => parseFloat(document.querySelector(selector).style.fontSize) > before, { selector: selector('text', 'program-stage'), before });
         assert.equal(position.x, original.x);
         assert.equal(position.y, original.y);
+    });
+
+    await t.test('horizontal alignment and clock centering survive automatic and manual sizing', async () => {
+        const originals = ['text', 'clock'].map(id => structuredClone(board.elements.find(element => element.id === id)));
+        try {
+            for (const id of ['text', 'clock'])
+            for (const autoFit of [false, true])
+            for (const align of ['left', 'center', 'right']) {
+                await apply(id, { autoFit, align, fontSize: 28, width: id === 'text' ? 480 : 250, height: 200,
+                    ...(id === 'text' ? { text: '中央に配置します\nEnglish 123' } : {}) });
+                for (const [page, stage] of [[editor, 'stage'], [editor, 'program-stage'], [viewer, 'stage']]) {
+                    const result = await page.locator(selector(id, stage)).evaluate(node => {
+                        const frame = node.getBoundingClientRect();
+                        const content = node.firstElementChild.getBoundingClientRect();
+                        const scale = frame.height / parseFloat(node.style.height);
+                        return { difference: Math.abs((content.top - frame.top) - (frame.bottom - content.bottom)) / scale,
+                            align: getComputedStyle(node).textAlign };
+                    });
+                    if (id === 'clock') assert.ok(result.difference < 0.2, `${id} in ${stage}: unequal vertical margins`);
+                    assert.equal(result.align, align);
+                }
+            }
+            await apply('text', { text: '長い文章を切り抜いて表示します。'.repeat(100), width: 80, height: 48, autoFit: true });
+            const clipped = await editor.locator(selector('text')).evaluate(node => {
+                const content = node.firstElementChild;
+                return { frameTop: node.getBoundingClientRect().top, textTop: content.firstElementChild.getBoundingClientRect().top,
+                    overflows: content.scrollHeight > content.clientHeight, scrollTop: content.scrollTop };
+            });
+            assert.ok(clipped.overflows);
+            assert.ok(Math.abs(clipped.frameTop - clipped.textTop) < 0.2, 'Clipped text lost its first lines');
+            assert.equal(clipped.scrollTop, 0);
+        } finally {
+            for (const original of originals) await apply(original.id, original);
+        }
+    });
+
+    await t.test('visible text pixels have equal top and bottom margins, including lowercase and descenders', async () => {
+        const original = structuredClone(board.elements.find(element => element.id === 'text'));
+        await editor.locator('#stage').click({ position: { x: 2, y: 2 } });
+        try {
+            for (const autoFit of [false, true])
+            for (const text of ['test', 'gyp', 'Ágj', '日本語', 'test\n日本語', 'abc 🌟', '\ntest\n']) {
+                await apply('text', { autoFit, text, x: 520, y: 140, width: 400, height: 300, fontSize: text.includes('\n') ? 64 : 120 });
+                for (const [page, stage] of [[editor, 'stage'], [editor, 'program-stage'], [viewer, 'stage']]) {
+                    const png = await page.locator(`${selector('text', stage)} .element-content`).screenshot();
+                    const margins = inkMargins(png);
+                    assert.ok(Math.abs(margins.top - margins.bottom) <= 2,
+                        `${JSON.stringify(text)} (${autoFit ? 'auto' : 'manual'}) in ${stage}: visible margins ${JSON.stringify(margins)}`);
+                    if (process.env.ILINTEA_AUTO_FIT_SCREENSHOT && autoFit && text === 'test' && page === viewer)
+                        await writeFile(process.env.ILINTEA_AUTO_FIT_SCREENSHOT.replace(/\.png$/, '.glyph.png'), png);
+                }
+            }
+        } finally { await apply('text', original); }
+    });
+
+    await t.test('alarms distribute top, middle and bottom gaps equally and center a lone timer', async () => {
+        const original = structuredClone(board.elements.find(element => element.id === 'alarm'));
+        try {
+            for (const autoFit of [false, true])
+            for (const message of ['残り時間', '残り時間\n複数行のメッセージ', '']) {
+                await apply('alarm', { autoFit, width: 800, height: 260, fontSize: 32, countdownText: message });
+                for (const [page, stage] of [[editor, 'stage'], [editor, 'program-stage'], [viewer, 'stage']]) {
+                    const gaps = await page.locator(selector('alarm', stage)).evaluate(node => {
+                        const frame = node.getBoundingClientRect();
+                        const style = getComputedStyle(node);
+                        const scale = frame.height / parseFloat(node.style.height);
+                        const timer = node.querySelector('.alarm-remaining').getBoundingClientRect();
+                        const message = node.querySelector('.alarm-message');
+                        const hasMessage = getComputedStyle(message).display !== 'none';
+                        const last = hasMessage ? message.getBoundingClientRect() : timer;
+                        const gaps = [timer.top - frame.top - parseFloat(style.borderTopWidth) * scale,
+                            frame.bottom - parseFloat(style.borderBottomWidth) * scale - last.bottom];
+                        if (hasMessage) gaps.push(last.top - timer.bottom);
+                        return gaps.map(gap => gap / scale);
+                    });
+                    assert.equal(gaps.length, message ? 3 : 2);
+                    assert.ok(Math.min(...gaps) >= 12 - 0.2, 'Minimum space around alarm text was lost');
+                    assert.ok(Math.max(...gaps) - Math.min(...gaps) < 0.2, `Unequal alarm gaps: ${gaps}`);
+                }
+                assert.ok(await fits(editor, 'alarm'));
+            }
+        } finally { await apply('alarm', original); }
     });
 
     await t.test('clock formats and languages fit without changing size on ticks', async () => {
