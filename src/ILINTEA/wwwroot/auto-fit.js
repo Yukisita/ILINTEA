@@ -1,6 +1,7 @@
 import { clockFitSamples } from './clock-format.js?v=20261109-auto-fit';
 
 export const minimumFontSize = 12;
+const preferredAlarmGap = 12;
 let textMetricsContext;
 
 // Search integer CSS pixels; the manual font-size limit does not apply here.
@@ -94,6 +95,9 @@ function measureLayout(node, element, locale, alarm, timer, automatic) {
         const number = property => parseFloat(style[property]) || 0;
         const height = element.height - number('paddingTop') - number('paddingBottom')
             - number('borderTopWidth') - number('borderBottomWidth');
+        // Leave room for even gaps when choosing the alarm font size. At the
+        // minimum font size, the layout can use whatever space is left over.
+        const alarmSpacing = alarm ? preferredAlarmGap * (alarm.message ? 3 : 2) : 0;
         const width = content.getBoundingClientRect().width;
         const fits = size => {
             probe.style.fontSize = `${size}px`;
@@ -103,7 +107,7 @@ function measureLayout(node, element, locale, alarm, timer, automatic) {
                     return bounds.width <= width && bounds.height <= height;
                 });
             }
-            if (content.getBoundingClientRect().height > height || content.scrollWidth > content.clientWidth) return false;
+            if (content.getBoundingClientRect().height + alarmSpacing > height || content.scrollWidth > content.clientWidth) return false;
             // Check text itself too: scrollWidth/clientWidth round to whole pixels.
             const targets = alarm ? [...content.children] : [textBody ?? content];
             return targets.every(target => {

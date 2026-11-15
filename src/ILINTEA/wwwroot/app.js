@@ -7,7 +7,7 @@ import { getAlarmState } from '/alarm-state.js?v=20261017';
 import { displayIsWaiting as isWaiting, elementIsVisible as isVisible } from '/display-state.js?v=20261017';
 import { preventSamePageNavigation } from '/navigation.js?v=20261026';
 import { createClockFormatter } from '/clock-format.js?v=20261109-auto-fit';
-import { createAutoFitter } from '/auto-fit.js?v=20261110-glyph-center';
+import { createAutoFitter } from '/auto-fit.js?v=20261115-alarm-spacing';
 
 await initializeI18n();
 preventSamePageNavigation(document.querySelectorAll('.brand, .mode-tabs a'));

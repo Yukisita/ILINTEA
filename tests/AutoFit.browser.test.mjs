@@ -140,7 +140,7 @@ test('auto-fit in Preview, Program and the viewer', { skip: !chromium, timeout: 
     };
     const size = (page, id, stage) => page.locator(selector(id, stage)).evaluate(node => parseFloat(node.style.fontSize));
     const waitSize = (page, id, expected, stage = 'stage') => page.waitForFunction(({ selector, expected }) => parseFloat(document.querySelector(selector)?.style.fontSize) === expected, { selector: selector(id, stage), expected });
-    const fits = (page, id) => page.locator(selector(id)).evaluate(node => {
+    const fits = (page, id, stage) => page.locator(selector(id, stage)).evaluate(node => {
         const content = node.firstElementChild;
         const targets = [content, ...content.children];
         // Compact timer lines allow visible glyph overflow into the gap. Check
@@ -283,10 +283,16 @@ test('auto-fit in Preview, Program and the viewer', { skip: !chromium, timeout: 
 
     await t.test('alarms distribute top, middle and bottom gaps equally and center a lone timer', async () => {
         const original = structuredClone(board.elements.find(element => element.id === 'alarm'));
+        const layouts = [
+            { width: 800, height: 260, fontSize: 32, messages: ['残り時間', '残り時間\n複数行のメッセージ', ''], compact: false },
+            { width: 500, height: 136, fontSize: 40, messages: ['gyp'], compact: true },
+            { width: 500, height: 56, fontSize: 12, messages: ['gyp', ''], compact: true }
+        ];
         try {
             for (const autoFit of [false, true])
-            for (const message of ['残り時間', '残り時間\n複数行のメッセージ', '']) {
-                await apply('alarm', { autoFit, width: 800, height: 260, fontSize: 32, countdownText: message });
+            for (const { width, height, fontSize, messages, compact } of layouts)
+            for (const message of messages) {
+                await apply('alarm', { autoFit, width, height, fontSize, countdownText: message });
                 for (const [page, stage] of [[editor, 'stage'], [editor, 'program-stage'], [viewer, 'stage']]) {
                     const gaps = await page.locator(selector('alarm', stage)).evaluate(node => {
                         const frame = node.getBoundingClientRect();
@@ -302,10 +308,11 @@ test('auto-fit in Preview, Program and the viewer', { skip: !chromium, timeout: 
                         return gaps.map(gap => gap / scale);
                     });
                     assert.equal(gaps.length, message ? 3 : 2);
-                    assert.ok(Math.min(...gaps) >= 12 - 0.2, 'Minimum space around alarm text was lost');
+                    if (!compact) assert.ok(Math.min(...gaps) >= 12 - 0.2, 'Expected space around alarm text in a tall frame');
                     assert.ok(Math.max(...gaps) - Math.min(...gaps) < 0.2, `Unequal alarm gaps: ${gaps}`);
+                    assert.ok(await fits(page, 'alarm', stage), `Clipped alarm at height ${height} in ${stage}`);
+                    if (!autoFit) assert.equal(await size(page, 'alarm', stage), fontSize);
                 }
-                assert.ok(await fits(editor, 'alarm'));
             }
         } finally { await apply('alarm', original); }
     });
