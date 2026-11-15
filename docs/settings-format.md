@@ -37,6 +37,12 @@ Clock display settings are stored in the optional `clockHourFormat` (12 or 24,
 default 24) and `clockShowSeconds` (boolean, default true) fields. Archives that
 omit them use 24-hour display with hours, minutes and seconds.
 
+Text, clock, and alarm elements store the optional boolean `autoFit` (default
+false). New elements of these kinds enable it, while archives that omit it retain
+manual sizing for compatibility. `fontSize` always stores the manual size (12–160),
+even when auto-fit is enabled; the fitted display size is calculated by each client
+and is not saved. Script and image elements do not use auto-fit.
+
 Live timestamps, revisions, image URLs, script scroll position, display schedules,
 alarm deadlines, and transient screen highlights are excluded. Pending displays
 are saved hidden; already displayed elements retain their visibility. Scripts

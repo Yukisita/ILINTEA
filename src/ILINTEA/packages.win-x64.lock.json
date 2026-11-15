@@ -1,7 +1,7 @@
 {
   "version": 1,
   "dependencies": {
-    "net10.0": {
+    "net10.0-windows7.0": {
       "SkiaSharp": {
         "type": "Direct",
         "requested": "[4.153.1, 4.153.1]",
@@ -25,7 +25,7 @@
         "contentHash": "Yqg6rChTVh0BUE8QQxtOA3uUBnihfgID4yex/AvDa0+os2bVcBjmI3Qj9tnOB+R1hd/Jry1Gwl8qw5JI9HZG8Q=="
       }
     },
-    "net10.0/win-x64": {
+    "net10.0-windows7.0/win-x64": {
       "SkiaSharp.NativeAssets.macOS": {
         "type": "Direct",
         "requested": "[4.153.1, 4.153.1]",

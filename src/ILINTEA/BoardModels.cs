@@ -4,7 +4,7 @@ public record Element(Guid Id, string Kind, double X, double Y, double Width, do
     string Text = "", int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = true,
     ScriptPlayback? Playback = null, DisplaySchedule? DisplaySchedule = null, string CountdownText = "",
     long ImageRevision = 0, AlarmSchedule? AlarmSchedule = null,
-    int ClockHourFormat = 24, bool ClockShowSeconds = true)
+    int ClockHourFormat = 24, bool ClockShowSeconds = true, bool AutoFit = false)
 {
     public string? ImageUrl => Kind == "image" ? $"/api/images/{Id}?v={ImageRevision}" : null;
 }
@@ -16,7 +16,7 @@ public record ScriptPlayback(double Speed = 30, double Offset = 0, DateTimeOffse
 }
 
 public record DisplaySchedule(Guid Id, DateTimeOffset At);
-public record AlarmSchedule(Guid Id, DateTimeOffset At);
+public record AlarmSchedule(Guid Id, DateTimeOffset At, DateTimeOffset? CreatedAt = null);
 public record ScreenHighlight(Guid Id, DateTimeOffset Until);
 
 public record CanvasSettings(string AspectRatio = "16:9", string BackgroundColor = "#000000")

@@ -13,7 +13,8 @@ internal sealed record SavedElement(Guid Id, string Kind, double X, double Y, do
     int FontSize = 64, string Color = "#ffffff", string Align = "left", bool Visible = false,
     string CountdownText = "", double ScriptSpeed = 30,
     int ClockHourFormat = 24, bool ClockShowSeconds = true,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ScriptFile = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ScriptFile = null,
+    bool AutoFit = false);
 internal sealed record BoardBackupState(CanvasSettings Canvas, Element[] Elements, Dictionary<Guid, ImageData> Images);
 
 public sealed class BoardArchiveException(string errorKey) : Exception(errorKey)
@@ -43,7 +44,7 @@ public static class BoardArchive
                 element.Color, element.Align, element.Visible,
                 element.CountdownText, element.Playback?.Speed ?? 30,
                 element.ClockHourFormat, element.ClockShowSeconds,
-                element.Kind == "script" ? ScriptName(element.Id) : null)).ToArray());
+                element.Kind == "script" ? ScriptName(element.Id) : null, element.AutoFit)).ToArray());
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: true);
         await using (var manifest = archive.CreateEntry(ManifestName, CompressionLevel.Optimal).Open())
             await JsonSerializer.SerializeAsync(manifest, configuration, Json, cancellationToken);
@@ -229,7 +230,8 @@ public static class BoardArchive
                 text, saved.FontSize, saved.Color, saved.Align, saved.Kind != "alarm" && saved.Visible,
                 saved.Kind == "script" ? new(Speed: saved.ScriptSpeed) : null,
                 CountdownText: saved.CountdownText,
-                ClockHourFormat: saved.ClockHourFormat, ClockShowSeconds: saved.ClockShowSeconds));
+                ClockHourFormat: saved.ClockHourFormat, ClockShowSeconds: saved.ClockShowSeconds,
+                AutoFit: saved.Kind is "text" or "clock" or "alarm" && saved.AutoFit));
             if (saved.Kind != "image") continue;
             var entry = SingleEntry(archive, ImageName(saved.Id));
             if (entry.Length is <= 0 or > UploadLimits.MaxFileBytes)

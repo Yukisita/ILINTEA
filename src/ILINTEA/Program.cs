@@ -6,16 +6,33 @@ using Microsoft.AspNetCore.Http.Features;
 using ILINTEA;
 
 var starting = true;
-var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+#if WINDOWS
+WebApplicationBuilder builder;
+try
 {
-    Args = args,
-    ContentRootPath = AppContext.BaseDirectory,
-    WebRootPath = "wwwroot"
-});
-builder.Configuration.AddIniFile("ILINTEA.ini", optional: false, reloadOnChange: false);
-I18n.SetLanguage(builder.Configuration["I18n:Language"]);
+    builder = CreateConfiguredBuilder(args);
+}
+catch (Exception exception)
+{
+    TrayApplication.ShowStartupError($"{I18n.Text("tray.configurationError")}\n\n{exception.GetBaseException().Message}");
+    return;
+}
+
+using var instance = TrayApplication.AcquireInstance();
+if (instance is null) return;
+#else
+var builder = CreateConfiguredBuilder(args);
+#endif
+
 if (!int.TryParse(builder.Configuration["Server:Port"], out var port) || port is < 1 or > 65535)
+{
+#if WINDOWS
+    TrayApplication.ShowStartupError(I18n.Text("tray.invalidPort"));
+    return;
+#else
     throw new InvalidOperationException("Invalid [Server] Port in ILINTEA.ini. Expected 1-65535.");
+#endif
+}
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -28,7 +45,20 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<BoardStore>();
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = UploadLimits.MaxFileBytes);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = UploadLimits.MaxRequestBodyBytes);
+#if WINDOWS
+WebApplication app;
+try
+{
+    app = builder.Build();
+}
+catch (Exception exception)
+{
+    TrayApplication.ShowStartupError($"{I18n.Text("tray.configurationError")}\n\n{exception.GetBaseException().Message}");
+    return;
+}
+#else
 var app = builder.Build();
+#endif
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 var version = typeof(Program).Assembly.GetName().Version!.ToString();
 
@@ -225,21 +255,40 @@ app.MapGet("/view/", (IWebHostEnvironment environment) =>
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     starting = false;
+#if !WINDOWS
     Console.WriteLine("ILINTEA");
     Console.WriteLine($"  Local:   http://localhost:{port}/");
     if (ViewerLink.FindLanAddress() is { } address)
         Console.WriteLine($"  Network: http://{address}:{port}/");
     Console.WriteLine();
     Console.WriteLine("Press Ctrl+C to stop.");
+#endif
 });
 
+#if WINDOWS
+try
+{
+    await TrayApplication.RunAsync(app, port);
+}
+catch (Exception exception) when (starting)
+{
+    var message = GetPortError(exception) switch
+    {
+        SocketError.AddressAlreadyInUse => string.Format(I18n.Text("tray.portInUse"), port),
+        SocketError.AccessDenied => string.Format(I18n.Text("tray.portAccessDenied"), port),
+        _ => $"{I18n.Text("tray.startupError")}\n\n{exception.GetBaseException().Message}"
+    };
+    TrayApplication.ShowStartupError(message);
+}
+#else
 try
 {
     await app.RunAsync();
 }
 catch (Exception exception) when (starting && GetPortError(exception) is { } error)
 {
-    Console.Error.WriteLine($"Error: Cannot listen on port {port}: {error}");
+    var reason = error == SocketError.AddressAlreadyInUse ? "address already in use." : "permission denied.";
+    Console.Error.WriteLine($"Error: Cannot listen on port {port}: {reason}");
     Console.Error.WriteLine("Stop the other app or change [Server] Port in ILINTEA.ini.");
     Environment.ExitCode = 1;
     if (!Console.IsInputRedirected)
@@ -247,6 +296,20 @@ catch (Exception exception) when (starting && GetPortError(exception) is { } err
         Console.WriteLine("Press Enter to exit.");
         Console.ReadLine();
     }
+}
+#endif
+
+static WebApplicationBuilder CreateConfiguredBuilder(string[] args)
+{
+    var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+    {
+        Args = args,
+        ContentRootPath = AppContext.BaseDirectory,
+        WebRootPath = "wwwroot"
+    });
+    builder.Configuration.AddIniFile("ILINTEA.ini", optional: false, reloadOnChange: false);
+    I18n.SetLanguage(builder.Configuration["I18n:Language"]);
+    return builder;
 }
 
 // A receive must stay active to observe close frames and keep-alive responses, even on an idle board.
@@ -288,14 +351,14 @@ static async Task<IResult> SaveImage(Guid? id, IFormFile file, BoardStore board,
         : Results.BadRequest(I18n.Error("errors.elementLimit"));
 }
 
-static string? GetPortError(Exception exception)
+static SocketError? GetPortError(Exception exception)
 {
     for (Exception? cause = exception; cause is not null; cause = cause.InnerException)
     {
         if (cause is AddressInUseException or SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse })
-            return "address already in use.";
+            return SocketError.AddressAlreadyInUse;
         if (cause is SocketException { SocketErrorCode: SocketError.AccessDenied })
-            return "permission denied.";
+            return SocketError.AccessDenied;
     }
     return null;
 }
