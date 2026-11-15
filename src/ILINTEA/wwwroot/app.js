@@ -6,7 +6,8 @@ import { connectBoardEvents } from '/board-connection.js?v=20261028-websocket';
 import { getAlarmState } from '/alarm-state.js?v=20261017';
 import { displayIsWaiting as isWaiting, elementIsVisible as isVisible } from '/display-state.js?v=20261017';
 import { preventSamePageNavigation } from '/navigation.js?v=20261026';
-import { createClockFormatter } from '/clock-format.js?v=20261028';
+import { createClockFormatter } from '/clock-format.js?v=20261109-auto-fit';
+import { createAutoFitter } from '/auto-fit.js?v=20261115-alarm-spacing';
 
 await initializeI18n();
 preventSamePageNavigation(document.querySelectorAll('.brand, .mode-tabs a'));
@@ -50,9 +51,10 @@ const nodes = new Map();
 const programNodes = new Map();
 const scriptLimits = new Map();
 const programScriptLimits = new Map();
+const autoFitter = createAutoFitter();
 const kinds = { text: 'kind.text', clock: 'kind.clock', image: 'kind.image', script: 'kind.script', alarm: 'kind.alarm' };
 const maxFileBytes = 1024 ** 3;
-const fields = { text: 'text', 'countdown-text': 'countdownText', 'font-size': 'fontSize', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height', 'clock-hour-format': 'clockHourFormat', 'clock-show-seconds': 'clockShowSeconds' };
+const fields = { text: 'text', 'countdown-text': 'countdownText', 'font-size': 'fontSize', 'auto-fit': 'autoFit', color: 'color', align: 'align', x: 'x', y: 'y', width: 'width', height: 'height', 'clock-hour-format': 'clockHourFormat', 'clock-show-seconds': 'clockShowSeconds' };
 let flipX = false;
 let flipY = false;
 try {
@@ -148,6 +150,11 @@ function createElementNode(element, editable) {
     node.dataset.id = element.id;
     const content = document.createElement('div');
     content.className = 'element-content';
+    if (element.kind === 'text') {
+        const text = document.createElement('div');
+        text.className = 'text-body';
+        content.append(text);
+    }
     if (element.kind === 'script') {
         const script = document.createElement('div');
         script.className = 'script-text';
@@ -196,16 +203,16 @@ function renderElement(node, element, editable, limits, layer) {
     node.style.zIndex = layer;
     node.style.width = `${element.width}px`;
     node.style.height = `${element.height}px`;
-    node.style.fontSize = `${element.fontSize}px`;
     node.style.color = element.color;
     node.style.textAlign = element.align;
     node.classList.toggle('selected', editable && element.id === selectedId);
-    if (element.kind === 'text') node.firstElementChild.textContent = element.text;
+    if (element.kind === 'text') node.firstElementChild.firstElementChild.textContent = element.text;
     if (element.kind === 'image') {
         const image = node.firstElementChild.firstElementChild;
         if (image.getAttribute('src') !== element.imageUrl) image.src = element.imageUrl;
     }
     if (element.kind === 'alarm') renderAlarmElement(node, element, editable);
+    else autoFitter.fit(node, element, { locale });
     if (element.kind === 'script') {
         const script = node.firstElementChild.firstElementChild;
         if (script.textContent !== element.text) script.textContent = element.text;
@@ -331,10 +338,13 @@ function renderProperties() {
     $('clock-settings').hidden = element.kind !== 'clock';
     $('replace-image').disabled = !connected || settingsBusy || imageBusy;
     $('type-fields').hidden = element.kind === 'image';
+    $('auto-fit-field').hidden = !['text', 'clock', 'alarm'].includes(element.kind);
+    $('font-size').disabled = element.autoFit === true && ['text', 'clock', 'alarm'].includes(element.kind);
     for (const [id, property] of Object.entries(fields)) {
         const input = $(id);
         if (document.activeElement === input) continue;
-        input.value = element[property] ?? '';
+        if (input.type === 'checkbox') input.checked = element[property] === true;
+        else input.value = element[property] ?? '';
     }
     renderScriptControls();
     renderDisplayControls();
@@ -359,6 +369,7 @@ function renderAlarmElement(node, element, editable) {
         else message.removeAttribute('role');
     }
     node.dataset.alarmPhase = alarm.phase;
+    autoFitter.fit(node, element, { locale, alarm });
 }
 
 function updateScheduledVisibility() {
@@ -911,6 +922,7 @@ if (!viewer) {
                 value = Number(value);
             }
             if (property === 'clockShowSeconds') value = value === 'true';
+            if (input.type === 'checkbox') value = input.checked;
             queuePatch(selectedId, { [property]: value });
         };
         input.addEventListener(input.tagName === 'TEXTAREA' || input.type === 'color' ? 'input' : 'change', update);
@@ -1020,6 +1032,10 @@ $('exit-fullscreen').addEventListener('click', () => document.exitFullscreen());
 document.addEventListener('fullscreenchange', resizeStage);
 new ResizeObserver(resizeStage).observe($('stage-host'));
 if (!viewer) new ResizeObserver(resizeStage).observe($('program-host'));
+// Loaded fallback fonts can change line breaks and numeric widths.
+const refitFonts = () => { autoFitter.clear(); render(); };
+document.fonts.ready.then(refitFonts);
+document.fonts.addEventListener('loadingdone', refitFonts);
 setInterval(updateClocks, 250);
 requestAnimationFrame(animateScripts);
 updateMirror();

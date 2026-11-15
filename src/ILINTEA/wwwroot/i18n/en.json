@@ -84,6 +84,7 @@
   "properties.selectionEmpty": "Select an element to edit\nits content, position and visibility.",
   "properties.text": "Text content",
   "properties.fontSize": "Font size",
+  "properties.autoFit": "Auto-fit font size",
   "properties.color": "Text color",
   "properties.align": "Alignment",
   "properties.alignLeft": "Left",
