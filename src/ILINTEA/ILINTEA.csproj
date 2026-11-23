@@ -19,7 +19,11 @@
   <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>wwwroot/images/ILINTEA_icon.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <EmbeddedResource Include="wwwroot/images/ILINTEA_icon.ico" LogicalName="ILINTEA.ApplicationIcon.ico" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="[4.153.1]" />
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="[4.153.1]" />
