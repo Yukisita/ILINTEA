@@ -79,9 +79,12 @@ internal static class TrayApplication
             exit.Enabled = false;
             lifetime.StopApplication();
         };
+        using var iconStream = typeof(TrayApplication).Assembly.GetManifestResourceStream("ILINTEA.ApplicationIcon.ico")
+            ?? throw new InvalidOperationException("Application icon resource was not found.");
+        using var trayIcon = new Icon(iconStream, SystemInformation.SmallIconSize);
         using var icon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = trayIcon,
             Text = I18n.Text("app.name"),
             ContextMenuStrip = menu
         };
