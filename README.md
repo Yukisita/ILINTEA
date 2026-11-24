@@ -1,4 +1,5 @@
 # ILINTEA（イリンテア）
+<img width="128" height="128" alt="ILINTEA_icon_128" src="https://github.com/user-attachments/assets/42065b4c-fc32-44f9-b01c-24554faa07a6" />
 
 配信・収録で、スタッフから出演者へ原稿や進行の指示、残り時間をリアルタイムに伝えるブラウザー型プロンプターです。
 
