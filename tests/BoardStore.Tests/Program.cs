@@ -25,6 +25,25 @@ Run("Partial patches retain placement and unrelated properties", () =>
     Equal(original with { Text = "updated" }, updated);
 });
 
+Run("New text, clocks and alarms enable auto-fit; toggling retains manual size and placement", () =>
+{
+    var board = new BoardStore();
+    foreach (var kind in new[] { "text", "clock", "alarm", "script", "image" })
+    {
+        var original = board.Add(kind)!;
+        var supported = kind is "text" or "clock" or "alarm";
+        Equal(supported, original.AutoFit);
+        var manual = board.Update(original.Id, Patch() with { FontSize = 96, AutoFit = false })!;
+        Equal(original with { FontSize = 96, AutoFit = false }, manual);
+        var automatic = board.Update(original.Id, Patch() with { AutoFit = true })!;
+        Equal(manual with { AutoFit = supported }, automatic);
+        var edited = board.Update(original.Id, Patch(text: "updated"))!;
+        Equal(automatic with { Text = "updated" }, edited);
+        var disabled = board.Update(original.Id, Patch() with { AutoFit = false })!;
+        Equal(edited with { AutoFit = false }, disabled);
+    }
+});
+
 Run("Clock display settings default to 24-hour with seconds and remain independent per element", () =>
 {
     var board = new BoardStore();
@@ -244,6 +263,7 @@ Run("Every element kind supports replacing and canceling a display schedule", ()
         Assert(first.Visible, "Scheduled display was not enabled");
         Equal(clock.Now.AddSeconds(10), first.DisplaySchedule!.At);
         if (kind == "alarm") Equal(clock.Now.AddMinutes(1), first.AlarmSchedule!.At);
+        if (kind == "alarm") Equal<DateTimeOffset?>(clock.Now, first.AlarmSchedule!.CreatedAt);
         else Equal<AlarmSchedule?>(null, first.AlarmSchedule);
         var updated = board.ScheduleDisplay(id, 20, clock.Now.AddMinutes(2))!;
         Equal(clock.Now.AddSeconds(20), updated.DisplaySchedule!.At);
@@ -331,6 +351,7 @@ Run("Alarms reject past and current times and remain cancelable after starting",
     Equal<Element?>(null, board.ScheduleAlarm(id, new(clock.Now)));
     var scheduled = board.ScheduleAlarm(id, new(clock.Now.AddSeconds(10).ToOffset(TimeSpan.FromHours(9))))!;
     Equal(clock.Now.AddSeconds(10), scheduled.AlarmSchedule!.At);
+    Equal<DateTimeOffset?>(clock.Now, scheduled.AlarmSchedule.CreatedAt);
     Equal(TimeSpan.Zero, scheduled.AlarmSchedule.At.Offset);
     clock.Now += TimeSpan.FromSeconds(10);
     Assert(board.CancelAlarm(id, scheduled.AlarmSchedule.Id), "Started alarm was not canceled");

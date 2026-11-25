@@ -112,7 +112,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 "alarm" => new Element(Guid.NewGuid(), kind, 80, 520, 960, 160,
                     text ?? "", 40, "#332701", CountdownText: countdownText ?? ""),
                 _ => new Element(Guid.NewGuid(), kind, 80, 120, 900, 180, "", 56)
-            }) with { Visible = false };
+            }) with { Visible = false, AutoFit = kind is "text" or "clock" or "alarm" };
             element = ScaleElement(element, canvas.Width / 1280, canvas.Height / 720);
             elements.Insert(0, element);
             if (image is not null) images.Add(element.Id, image);
@@ -138,6 +138,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
                 Height = patch.Height ?? current.Height,
                 Text = patch.Text ?? current.Text,
                 FontSize = patch.FontSize ?? current.FontSize,
+                AutoFit = current.Kind is "text" or "clock" or "alarm" && (patch.AutoFit ?? current.AutoFit),
                 Color = patch.Color ?? current.Color,
                 Align = patch.Align ?? current.Align,
                 Visible = patch.Visible ?? current.Visible,
@@ -226,7 +227,7 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
             {
                 Visible = true, DisplaySchedule = schedule, Playback = playback,
                 AlarmSchedule = element.Kind == "alarm"
-                    ? new(Guid.NewGuid(), alarmAt!.Value.ToUniversalTime()) : element.AlarmSchedule
+                    ? new(Guid.NewGuid(), alarmAt!.Value.ToUniversalTime(), now) : element.AlarmSchedule
             };
         });
 
@@ -243,11 +244,12 @@ public sealed class BoardStore(TimeProvider? timeProvider = null)
     public Element? ScheduleAlarm(Guid id, ScheduleAlarm request) =>
         UpdateElement(id, element =>
         {
-            if (request.At <= clock.GetUtcNow()) return null;
+            var now = clock.GetUtcNow();
+            if (request.At <= now) return null;
             return element with
             {
                 Visible = true,
-                AlarmSchedule = new(Guid.NewGuid(), request.At.ToUniversalTime())
+                AlarmSchedule = new(Guid.NewGuid(), request.At.ToUniversalTime(), now)
             };
         }, kind: "alarm");
 

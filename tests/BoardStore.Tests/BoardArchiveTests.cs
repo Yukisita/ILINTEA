@@ -66,6 +66,23 @@ internal static class BoardArchiveTests
             target.Unsubscribe(subscription.Id);
         });
 
+        await Run("Auto-fit and manual sizes round-trip independently for all supported kinds", async () =>
+        {
+            var source = new BoardStore();
+            foreach (var kind in new[] { "text", "clock", "alarm" })
+            foreach (var enabled in new[] { true, false })
+            {
+                var element = source.Add(kind)!;
+                source.Update(element.Id, new(null, null, null, null, null, 96, null, null, null,
+                    AutoFit: enabled));
+            }
+            var expected = source.Snapshot();
+            using var archive = new MemoryStream(await SaveAsync(source));
+            var restored = await BoardArchive.RestoreAsync(archive, new BoardStore());
+            for (var index = 0; index < expected.Elements.Length; index++)
+                Equal(expected.Elements[index] with { Id = restored.Elements[index].Id }, restored.Elements[index]);
+        });
+
         await Run("Scripts cleared to empty or whitespace round-trip without losing the rest of the board", async () =>
         {
             foreach (var blank in new[] { "", " \t\r\n" })
@@ -175,9 +192,35 @@ internal static class BoardArchiveTests
             var element = restored.Elements.Single();
             Equal("", element.Text);
             Equal(64, element.FontSize);
+            Assert(!element.AutoFit, "Legacy settings enabled auto-fit");
             Equal("#ffffff", element.Color);
             Equal("left", element.Align);
             Assert(!element.Visible && element.CountdownText == "", "Optional fields lost their defaults");
+        });
+
+        await Run("Legacy text, clocks and alarms retain manual sizing when auto-fit is omitted", async () =>
+        {
+            foreach (var kind in new[] { "text", "clock", "alarm" })
+            {
+                var json = JsonNode.Parse(currentManifest)!;
+                json["elements"]![0]!["kind"] = kind;
+                json["elements"]![0]!["fontSize"] = 87;
+                using var archive = new MemoryStream(CreateArchive(json.ToJsonString()));
+                var restored = await BoardArchive.RestoreAsync(archive, new BoardStore());
+                var element = restored.Elements.Single();
+                Assert(!element.AutoFit, "Legacy element enabled auto-fit");
+                Equal(87, element.FontSize);
+            }
+        });
+
+        await Run("Invalid auto-fit settings never replace the current board", async () =>
+        {
+            foreach (var invalid in new JsonNode?[] { JsonValue.Create("true"), JsonValue.Create(1), null })
+            {
+                var json = JsonNode.Parse(currentManifest)!;
+                json["elements"]![0]!["autoFit"] = invalid;
+                await RejectUnchangedAsync(CreateArchive(json.ToJsonString()), "errors.settingsFileFormat");
+            }
         });
 
         await Run("Twenty large scripts do not enlarge the JSON manifest with their contents", async () =>

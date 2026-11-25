@@ -21,7 +21,7 @@ public record CanvasPatch(string? AspectRatio, string? BackgroundColor)
 
 public record ElementPatch(double? X, double? Y, double? Width, double? Height, string? Text,
     int? FontSize, string? Color, string? Align, bool? Visible, string? CountdownText = null,
-    int? ClockHourFormat = null, bool? ClockShowSeconds = null)
+    int? ClockHourFormat = null, bool? ClockShowSeconds = null, bool? AutoFit = null)
 {
     public bool IsValid() =>
         new[] { X, Y, Width, Height }.All(value => value is null || double.IsFinite(value.Value)) &&
