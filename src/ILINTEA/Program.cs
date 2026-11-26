@@ -73,7 +73,7 @@ app.UseWebSockets(new WebSocketOptions
 app.MapGet("/LICENSE", () => Results.File(
     Path.Combine(app.Environment.ContentRootPath, "LICENSE"), "text/plain; charset=utf-8"));
 app.MapGet("/THIRD-PARTY-NOTICES.txt", () => Results.File(
-    Path.Combine(app.Environment.ContentRootPath, "THIRD-PARTY-NOTICES.txt"), "text/plain; charset=utf-8"));
+    Path.Combine(app.Environment.ContentRootPath, "licenses", "THIRD-PARTY-NOTICES.txt"), "text/plain; charset=utf-8"));
 foreach (var noticeFile in new[] { "LICENSE.txt", "THIRD-PARTY-NOTICES.txt", "ADDITIONAL-NOTICES.txt" })
 {
     app.MapGet($"/licenses/SkiaSharp/{noticeFile}", () => Results.File(

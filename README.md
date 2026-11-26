@@ -28,4 +28,4 @@ Windowsでは、`ILINTEA.exe` を起動するとタスクバーの通知領域�
 
 [MIT License](LICENSE) — Copyright (c) 2026 S.Yukisita
 
-第三者のライセンス・著作権表示は[THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt)をご覧ください。
+第三者のライセンス・著作権表示は[THIRD-PARTY-NOTICES.txt](licenses/THIRD-PARTY-NOTICES.txt)をご覧ください。

@@ -10,7 +10,7 @@ $applicationRoot = Join-Path $repositoryRoot 'src/ILINTEA'
 $sourceRoot = Join-Path $applicationRoot 'wwwroot'
 $sourceFiles = @(Get-ChildItem -LiteralPath $sourceRoot -File -Recurse)
 $executable = if ([Environment]::OSVersion.Platform -eq 'Win32NT') { 'ILINTEA.exe' } else { 'ILINTEA' }
-$noticeFiles = @('LICENSE', 'THIRD-PARTY-NOTICES.txt',
+$noticeFiles = @('LICENSE', 'licenses/THIRD-PARTY-NOTICES.txt',
     'licenses/SkiaSharp/LICENSE.txt', 'licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt',
     'licenses/SkiaSharp/ADDITIONAL-NOTICES.txt')
 
