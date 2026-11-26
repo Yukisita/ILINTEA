@@ -10,13 +10,9 @@ $applicationRoot = Join-Path $repositoryRoot 'src/ILINTEA'
 $sourceRoot = Join-Path $applicationRoot 'wwwroot'
 $sourceFiles = @(Get-ChildItem -LiteralPath $sourceRoot -File -Recurse)
 $executable = if ([Environment]::OSVersion.Platform -eq 'Win32NT') { 'ILINTEA.exe' } else { 'ILINTEA' }
-$noticeSourceByOutputPath = [ordered]@{
-    'LICENSE' = 'LICENSE'
-    'THIRD-PARTY-NOTICES.txt' = 'licenses/THIRD-PARTY-NOTICES.txt'
-    'licenses/SkiaSharp/LICENSE.txt' = 'licenses/SkiaSharp/LICENSE.txt'
-    'licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt' = 'licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt'
-    'licenses/SkiaSharp/ADDITIONAL-NOTICES.txt' = 'licenses/SkiaSharp/ADDITIONAL-NOTICES.txt'
-}
+$noticeFiles = @('LICENSE', 'licenses/THIRD-PARTY-NOTICES.txt',
+    'licenses/SkiaSharp/LICENSE.txt', 'licenses/SkiaSharp/THIRD-PARTY-NOTICES.txt',
+    'licenses/SkiaSharp/ADDITIONAL-NOTICES.txt')
 
 foreach ($configurationName in $Configuration) {
     $outputRoot = if ($ArtifactsPath) {
@@ -24,15 +20,14 @@ foreach ($configurationName in $Configuration) {
     } else {
         Join-Path $applicationRoot "bin/$configurationName"
     }
-    foreach ($requiredFile in (@($executable, 'ILINTEA.dll', 'ILINTEA.deps.json', 'ILINTEA.runtimeconfig.json', 'ILINTEA.ini') + @($noticeSourceByOutputPath.Keys))) {
+    foreach ($requiredFile in (@($executable, 'ILINTEA.dll', 'ILINTEA.deps.json', 'ILINTEA.runtimeconfig.json', 'ILINTEA.ini') + $noticeFiles)) {
         if (-not (Test-Path -LiteralPath (Join-Path $outputRoot $requiredFile) -PathType Leaf)) {
             throw "$configurationName output is missing $requiredFile. Build this configuration first."
         }
     }
 
-    foreach ($notice in $noticeSourceByOutputPath.Keys) {
-        $noticeSourcePath = Join-Path $repositoryRoot $noticeSourceByOutputPath[$notice]
-        if ((Get-FileHash -LiteralPath $noticeSourcePath).Hash -ne
+    foreach ($notice in $noticeFiles) {
+        if ((Get-FileHash -LiteralPath (Join-Path $repositoryRoot $notice)).Hash -ne
             (Get-FileHash -LiteralPath (Join-Path $outputRoot $notice)).Hash) {
             throw "$configurationName output has an outdated $notice."
         }
